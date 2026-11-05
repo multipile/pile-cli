@@ -1,0 +1,11 @@
+version = "gitpile/1"
+
+[[edges]]
+type = "uses"
+target = "@store-memory"
+title = "keeps values in memory when no database is given"
+
+[[edges]]
+type = "uses"
+target = "@store-disk"
+title = "keeps values in a database when one is given"

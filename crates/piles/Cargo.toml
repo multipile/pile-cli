@@ -1,0 +1,11 @@
+[package]
+name = "piles"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Every declaration is read through the storage interface.
+storage = { path = "../storage" }

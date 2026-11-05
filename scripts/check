@@ -1,0 +1,22 @@
+#!/bin/sh
+# The whole check: build bin/pile, check the formatting, run clippy and every
+# crate's tests, run every journey against bin/pile, build for every platform
+# a release is built for, then ask bin/pile doctor about this repository's
+# own piles. Run it from the root, under mise. CI runs it on every push and
+# pull request.
+#
+# cross is here so that a commit that no longer compiles or links for one of
+# a release's platforms fails on its own push, not at the next release. It
+# proves only that the binaries build. No runner here is a Mac, so the macOS
+# binaries are linked and never run.
+#
+# doctor is last, and prints its report only when it finds a problem, so
+# the check fails with the report in front of whoever ran it.
+set -eu
+scripts/build
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+QUIET=1 PILE_BIN="$PWD/bin/pile" journeys/run
+scripts/cross >/dev/null
+bin/pile doctor --format text >/dev/null || bin/pile doctor --format text

@@ -1,0 +1,23 @@
+[package]
+name = "graph"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Every declaration is read through the storage interface.
+storage = { path = "../storage" }
+# What a pile is: its config, its intent, and where it sits. Its rows are
+# read off what this finds.
+piles = { path = "../piles" }
+# Every .toml file in a .pile/ is parsed by toml_edit. Its parser keeps the
+# span of each header, key and value, so a row and a finding can say the line
+# and column where they are written. Only the parser is taken: nothing here
+# writes TOML.
+toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
+
+[dev-dependencies]
+# A fresh git repository for each test in tests/.
+tempfile = "3.27.0"

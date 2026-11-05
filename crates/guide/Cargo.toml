@@ -1,0 +1,11 @@
+[package]
+name = "guide"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# The pages are text, and their front matter is a few key = value lines, as
+# a pile's config is. Nothing here needs a dependency.
+[dependencies]

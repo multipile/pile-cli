@@ -1,0 +1,47 @@
+#!/bin/sh
+# Build bin/pile-<os>-<arch> for every platform in PLATFORMS, and print the
+# path of each. Run it from the root, under mise.
+#
+# Platforms are named os/arch the way Go names them, because a release's
+# files are called by those names, and mise's github backend matches on
+# them. Each is a Rust target. Linux is built on musl, so the binary links no
+# libc. cargo-zigbuild links all four from whichever host runs this.
+#
+# VERSION is what `pile version` prints first. Unset, it is "dev", as
+# scripts/build leaves it. scripts/release sets it.
+set -eu
+platforms=${PLATFORMS:-"darwin/arm64 darwin/amd64 linux/arm64 linux/amd64"}
+PILE_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
+PILE_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+PILE_VERSION=${VERSION:-dev}
+export PILE_COMMIT PILE_DATE PILE_VERSION
+targets=
+for platform in $platforms; do
+  os=${platform%/*}
+  arch=${platform#*/}
+  case $arch in
+    arm64) cpu=aarch64 ;;
+    amd64) cpu=x86_64 ;;
+    *) cpu= ;;
+  esac
+  case $os in
+    darwin) target=$cpu-apple-darwin ;;
+    linux) target=$cpu-unknown-linux-musl ;;
+    *) target= ;;
+  esac
+  if [ "$os" = "$platform" ] || [ -z "$cpu" ] || [ -z "$target" ]; then
+    echo "PLATFORMS takes pairs of darwin|linux and arm64|amd64, such as linux/arm64, not $platform" >&2
+    exit 2
+  fi
+  targets="$targets $os-$arch:$target"
+done
+mkdir -p bin
+for pair in $targets; do
+  name=${pair%%:*}
+  target=${pair#*:}
+  cargo zigbuild --release --locked -p pile --target "$target" >&2
+  out="bin/pile-$name"
+  cp "target/$target/release/pile" "$out.new"
+  mv "$out.new" "$out"
+  echo "$out"
+done

@@ -1,0 +1,7 @@
+version = "gitpile/1"
+
+[[edges]]
+type = "exercises"
+target = "@app"
+title = "tells each story against the built server"
+through = "binary"

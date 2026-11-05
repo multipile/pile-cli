@@ -1,0 +1,6 @@
+version = "gitpile/1"
+
+[[edges]]
+type = "uses"
+target = "@api"
+title = "drives every backend through the interface"

@@ -1,0 +1,16 @@
+version = "gitpile/1"
+
+[[nodes]]
+type = "external"
+name = "database"
+title = "the database a deployment provides"
+
+[[nodes]]
+type = "external"
+name = "backup"
+title = "the copy of the database kept elsewhere"
+
+[[edges]]
+type = "replicates-to"
+source = "external:database"
+target = "external:backup"
