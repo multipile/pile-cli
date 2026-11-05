@@ -2,7 +2,9 @@
 # scripts/check, scripts/build, scripts/cross and scripts/release all assume
 # it. So run them in a shell with mise activated here, or as `mise x -- …`.
 #
-# Rust comes with the four targets a release is built for. zig with
+# Rust is one exact version, never latest: the check and the release must
+# build with the same compiler, and mise can resolve latest afresh, past the
+# lock. It comes with the four targets a release is built for. zig with
 # cargo-zigbuild is the linker, so one host builds all four: Linux binaries
 # are linked statically against musl, and macOS needs a linker that no Linux
 # host has. On a Linux host the ordinary build links through scripts/zig-cc
@@ -14,14 +16,15 @@
 #
 # mise itself is pinned by min_version. A mise older than this refuses to
 # work here, and CI reads this line to install exactly this version.
-# mise.lock pins every tool below to a checksum per platform, and
-# mise-action installs with --locked when it finds the lock. To move either:
+# mise.lock pins every tool below to a checksum per platform, except rust,
+# which rustup installs by its version alone. mise-action installs with
+# --locked when it finds the lock. To move either:
 # run `mise self-update`, change this line, then run `mise lock`, all in one
 # commit.
 min_version = "2026.9.17"
 
 [tools]
-rust = { version = "latest", components = "clippy,rustfmt", targets = "aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,aarch64-apple-darwin,x86_64-apple-darwin" }
+rust = { version = "1.99.1", components = "clippy,rustfmt", targets = "aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,aarch64-apple-darwin,x86_64-apple-darwin" }
 zig = "0.16.0"
 "aqua:rust-cross/cargo-zigbuild" = "0.23.4"
 jq = "1.8.2"
