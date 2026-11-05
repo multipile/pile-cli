@@ -1,0 +1,6 @@
+version = "gitpile/1"
+
+[[edges]]
+type = "implements"
+source = "@store-memory"
+title = "implements the store interface"

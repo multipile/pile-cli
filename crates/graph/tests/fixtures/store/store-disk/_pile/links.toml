@@ -1,0 +1,19 @@
+version = "gitpile/1"
+
+[[edges]]
+type = "implements"
+target = "@api"
+title = "implements the store interface"
+description = """
+A change to the interface is carried into the tables here.
+"""
+
+[[edges]]
+type = "conforms-to"
+target = "@api-tests"
+title = "is held to the store tests"
+
+[[edges]]
+type = "stores-in"
+target = "external:database"
+title = "keeps every value in"

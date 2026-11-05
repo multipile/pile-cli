@@ -1,0 +1,23 @@
+# One workspace for every crate in this repository. Each crate is a folder
+# under crates/: the `pile` binary is crates/pile, and each library is
+# crates/<name>. They share one lock, one set of dependency versions and one
+# target/. Each crate builds and tests on its own with `cargo test -p <crate>`.
+#
+# No crate states a version, so cargo takes each one as 0.0.0. What
+# `pile version` prints is the release tag, which scripts/tag counts and
+# scripts/release builds into the binary as PILE_VERSION.
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.98"
+publish = false
+license = "MIT"
+repository = "https://github.com/multipile/pile-cli"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

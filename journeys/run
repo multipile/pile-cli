@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# Runs the journeys, each in a fresh repository of its own, against a pile
+# built from this checkout, so a pass says something about this checkout and
+# not about whatever pile is on PATH.
+#
+#   journeys/run                          every journey
+#   journeys/run a-mistyped-command       one, by name or by path
+#   SHOW=1 journeys/run <journey>         print the session as it goes
+#   KEEP=1 journeys/run                   keep each journey's repository
+#   PILE_BIN=$(which pile) journeys/run   ask another binary instead
+#   CAST=<dir> journeys/run               record each as <dir>/<name>.cast
+#   QUIET=1 journeys/run                  print a journey only when it fails
+#
+# It exits non-zero when any journey did.
+set -u
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+root=$(dirname "$here")
+JOURNEY_LIB=$here/lib.sh
+export JOURNEY_LIB
+
+# A journey is a person's session unless it says otherwise. A developer
+# working beside an agent has AI_AGENT or AGENT set, and inherited, every
+# journey would run as an agent's in one shell and as a person's in the
+# next. A journey about agents sets one itself.
+unset AI_AGENT AGENT
+# Nobody's git reaches a journey's repository: no configuration, and none of
+# the variables a git hook sets, which point git at the hook's repository.
+# shellcheck disable=SC2046
+unset $(git rev-parse --local-env-vars 2>/dev/null) GIT_INDEX_FILE
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+
+journeys=()
+if (($# > 0)); then
+	for arg in "$@"; do
+		if [[ -f $arg ]]; then
+			journeys+=("$(cd "$(dirname "$arg")" && pwd -P)/$(basename "$arg")")
+		elif [[ -f $here/stories/$arg.sh ]]; then
+			journeys+=("$here/stories/$arg.sh")
+		else
+			printf 'no journey called %s\n' "$arg" >&2
+			exit 2
+		fi
+	done
+else
+	journeys=("$here"/stories/*.sh)
+fi
+
+if [[ -n ${PILE_BIN:-} ]]; then
+	PILE=$PILE_BIN
+	printf 'binary  %s (PILE_BIN)\n' "$PILE"
+else
+	if ! (cd "$root" && cargo build -q -p pile); then
+		printf 'building pile from this checkout failed\n' >&2
+		exit 1
+	fi
+	PILE=$(cd "$root" && cargo metadata -q --format-version 1 --no-deps | jq -r .target_directory)/debug/pile
+	printf 'binary  built from this checkout\n'
+fi
+export PILE
+
+# Under CAST, a journey runs under asciinema with SHOW on, so the cast is the
+# session. --return makes the recorder exit as the journey did, or a failing
+# journey would pass with a cast of the failure beside it. --headless records
+# without a terminal, so recording works in a script as in a shell.
+run_one() { bash "$journey"; }
+if [[ -n ${CAST:-} ]]; then
+	if ! command -v asciinema >/dev/null 2>&1; then
+		printf 'CAST is set, and there is no asciinema on PATH\n' >&2
+		exit 2
+	fi
+	mkdir -p "$CAST" || exit 1
+	CAST=$(cd "$CAST" && pwd -P)
+	export SHOW=1
+	printf 'casts   %s\n' "$CAST"
+	run_one() {
+		asciinema rec -q --headless --overwrite --return --window-size 100x40 \
+			-i 1 -t "$name" -c "bash '$journey'" "$CAST/$name.cast"
+	}
+fi
+
+passed=0
+failed=()
+for journey in "${journeys[@]}"; do
+	name=$(basename "$journey" .sh)
+	work=$(mktemp -d "${TMPDIR:-/tmp}/pile-journey-XXXXXX") || exit 1
+	if [[ -n ${QUIET:-} ]]; then
+		if said=$(cd "$work" && run_one 2>&1); then
+			passed=$((passed + 1))
+		else
+			failed+=("$name")
+			printf '\n%s\n%s\n' "$name" "$said"
+		fi
+	else
+		printf '\n%s\n' "$name"
+		if (cd "$work" && run_one); then
+			passed=$((passed + 1))
+		else
+			failed+=("$name")
+		fi
+	fi
+	if [[ -n ${CAST:-} ]]; then
+		printf '  cast    %s\n' "$CAST/$name.cast"
+	fi
+	if [[ -n ${KEEP:-} ]]; then
+		printf '  kept    %s\n' "$work"
+	else
+		rm -rf "$work"
+	fi
+done
+
+printf '\n%s passed, %s failed\n' "$passed" "${#failed[@]}"
+for name in "${failed[@]}"; do
+	printf '  failed  %s\n' "$name"
+done
+((${#failed[@]} == 0))

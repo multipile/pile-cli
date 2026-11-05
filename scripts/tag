@@ -1,0 +1,72 @@
+#!/bin/sh
+# Claim the next version for HEAD by pushing the tag v<version> to origin.
+# scripts/release then publishes that version. Run it from the root with a
+# clean tree, as somebody who can push tags. In CI the tag is also written to
+# GITHUB_OUTPUT as tag=. That is how the release job later in the same run
+# learns which tag to release, because a push made with the token the CI
+# platform hands a run starts no run of its own.
+#
+# The version is major.minor.patch. The major and the minor are set below,
+# by hand, in the commit that justifies them:
+#
+# - the major moves when a release breaks something somebody relied on;
+# - the minor moves when a release adds something worth a reader's notice;
+# - the patch goes back to 0 when either moves.
+#
+# The patch is one more than the highest v<major>.<minor>.* tag that origin
+# already has. So the count lives in git and nowhere else. Every release is
+# semver and newer than the last, which is what lets mise's `latest` move
+# with each one.
+#
+# The push is the claim. origin refuses a tag it already has, so two runs
+# that count the same patch cannot both get it, and the run that was refused
+# counts again. A commit that already has a v* tag on origin is not tagged
+# twice.
+set -eu
+
+major=0
+minor=1
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "the working tree is not HEAD; a release is made of a commit" >&2
+  exit 1
+fi
+commit=$(git rev-parse HEAD)
+
+claimed() {
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    echo "tag=$1" >>"$GITHUB_OUTPUT"
+  fi
+  exit 0
+}
+
+tries=0
+while :; do
+  tags=$(git ls-remote --tags --refs origin 'v*')
+  tags=$(printf '%s\n' "$tags" | sed 's|refs/tags/||')
+  tagged=$(printf '%s\n' "$tags" | awk -v c="$commit" '$1 == c { print $2; exit }')
+  if [ -n "$tagged" ]; then
+    echo "$commit is already tagged $tagged"
+    claimed "$tagged"
+  fi
+  line=$major.$minor
+  last=$(printf '%s\n' "$tags" | awk -v p="v$line." '
+    index($2, p) == 1 && substr($2, length(p) + 1) ~ /^(0|[1-9][0-9]*)$/ { print substr($2, length(p) + 1) }
+  ' | sort -n | tail -n 1)
+  tag="v$line.$((${last:--1} + 1))"
+
+  if git push origin "$commit:refs/tags/$tag"; then
+    echo "tagged $commit $tag"
+    claimed "$tag"
+  fi
+  if [ -z "$(git ls-remote --tags --refs origin "refs/tags/$tag")" ]; then
+    echo "origin refused $tag for a reason other than already having it" >&2
+    exit 1
+  fi
+  tries=$((tries + 1))
+  if [ "$tries" -ge 5 ]; then
+    echo "somebody else claimed $tries versions first; giving up" >&2
+    exit 1
+  fi
+  echo "somebody else claimed $tag first; counting again" >&2
+done

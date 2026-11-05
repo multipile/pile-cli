@@ -1,0 +1,103 @@
+# Every push and pull request runs scripts/check. A push to main that passes
+# is tagged, then released: scripts/tag claims the next major.minor.patch by
+# pushing v<that>, and scripts/release cross-compiles the tagged commit and
+# publishes it. mise's github backend finds the release there. A v* tag
+# pushed by hand is checked and released by its own run.
+#
+# The run on main releases its tag itself, because GitHub starts no run for
+# a push made with the GITHUB_TOKEN it hands a run. So the tag it pushes
+# would start nothing. Every job works with that token. The jobs that tag and
+# release ask for contents: write, which covers pushing a tag and writing a
+# release; check only reads.
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+# mise.toml sets env, and mise asks for a checkout to be trusted first.
+#
+# Every job with mise in it installs the mise that mise.toml names in
+# min_version. It is read off that line, so it is written in one place, and
+# left to itself mise-action would take the newest release. mise.lock makes
+# the install --locked.
+env:
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # scripts/build stamps the commit
+      - id: mise
+        run: |
+          version=$(sed -n 's/^min_version = "\(.*\)"$/\1/p' mise.toml)
+          test -n "$version" || { echo "mise.toml names no min_version" >&2; exit 1; }
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+      - uses: jdx/mise-action@v5
+        with:
+          version: ${{ steps.mise.outputs.version }}
+      - run: scripts/check
+
+  tag:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: tag
+        run: scripts/tag
+
+  # The tag this run pushed, which starts no run of its own.
+  release-main:
+    needs: tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+          fetch-depth: 0
+      - id: mise
+        run: |
+          version=$(sed -n 's/^min_version = "\(.*\)"$/\1/p' mise.toml)
+          test -n "$version" || { echo "mise.toml names no min_version" >&2; exit 1; }
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+      - uses: jdx/mise-action@v5
+        with:
+          version: ${{ steps.mise.outputs.version }}
+      - run: scripts/release "${{ needs.tag.outputs.tag }}"
+        env:
+          RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # A tag pushed by hand, whose own run this is.
+  release:
+    needs: check
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: mise
+        run: |
+          version=$(sed -n 's/^min_version = "\(.*\)"$/\1/p' mise.toml)
+          test -n "$version" || { echo "mise.toml names no min_version" >&2; exit 1; }
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+      - uses: jdx/mise-action@v5
+        with:
+          version: ${{ steps.mise.outputs.version }}
+      - run: scripts/release
+        env:
+          RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}

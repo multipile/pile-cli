@@ -1,0 +1,44 @@
+[package]
+name = "pile"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# A library, and the binary on top of it. The library is what the commands
+# stand on and the commands themselves. src/main.rs is the process that runs
+# them. They are split so each module's tests run without a process, and so
+# the suite in tests/ drives the binary that cargo builds from main.rs.
+[lib]
+name = "pile"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pile"
+path = "src/main.rs"
+
+[dependencies]
+# Every read of a repository goes through its storage interface.
+storage = { path = "../storage" }
+# What a pile is: its config, its intent, and which pile holds a path.
+piles = { path = "../piles" }
+# What the piles' .toml files declare, as rows, and what doctor finds wrong
+# with them.
+graph = { path = "../graph" }
+# The pages pile guide prints, compiled in.
+guide = { path = "../guide" }
+
+# Arguments, help and completion. clap_complete's dynamic engine asks this
+# binary what to offer at each keystroke, so later commands can complete
+# with what the repository holds at that moment.
+clap = { version = "4.6.7", default-features = false, features = ["std", "help", "usage", "error-context", "suggestions"] }
+clap_complete = { version = "4.6.11", features = ["unstable-dynamic"] }
+
+# A structured answer is JSON. preserve_order keeps a result's fields in the
+# order the command wrote them.
+serde_json = { version = "1.0.151", features = ["preserve_order"] }
+
+[dev-dependencies]
+# A fresh git repository and an empty HOME for each test in tests/.
+tempfile = "3.27.0"

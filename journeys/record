@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Records journeys with asciinema, every one or those named, into casts/
+# beside this file: one .cast per journey. `asciinema play casts/<name>.cast`
+# plays one back. A cast is of one run of one checkout, so git ignores it.
+#
+#   journeys/record                       every journey
+#   journeys/record a-mistyped-command    one
+#
+# Run it under mise, which brings asciinema: `mise x -- journeys/record`.
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+CAST=${CAST:-$here/casts} exec "$here/run" "$@"

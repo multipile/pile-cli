@@ -1,0 +1,42 @@
+version = "gitpile/1"
+
+[[node-types]]
+name = "external"
+title = "something outside the repository that a pile relies on"
+
+[[edge-types]]
+name = "implements"
+title = "one pile implements an interface another declares"
+source = ["pile"]
+target = ["pile"]
+do = "Name what is implemented."
+
+[[edge-types]]
+name = "uses"
+title = "one pile calls code another holds"
+source = ["pile"]
+target = ["pile"]
+
+[[edge-types]]
+name = "conforms-to"
+title = "one pile is held to the tests another states"
+source = ["pile"]
+target = ["pile"]
+
+[[edge-types]]
+name = "stores-in"
+title = "one pile keeps its data in something outside the repository"
+source = ["pile"]
+target = ["external"]
+
+[[edge-types]]
+name = "exercises"
+title = "one pile runs another whole, as its users would"
+source = ["pile"]
+target = ["pile"]
+
+[[edge-types]]
+name = "replicates-to"
+title = "one thing outside the repository is copied to another"
+source = ["external"]
+target = ["external"]

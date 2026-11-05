@@ -1,0 +1,17 @@
+#!/bin/sh
+# zig as the C compiler and linker for this machine's own Rust builds. So the
+# tests, the build scripts and an ordinary cargo build link with the zig that
+# mise pins, not with whatever cc the machine has, or none. mise.toml names
+# this script for Linux hosts only, because macOS links with its own.
+# Releases do not come through here: scripts/cross uses cargo-zigbuild, which
+# wraps zig the same way for each target.
+#
+# rustc passes a flag that zig's linker does not know, so it is dropped.
+for arg; do
+  shift
+  case $arg in
+    -Wl,--fix-cortex-a53-843419) ;;
+    *) set -- "$@" "$arg" ;;
+  esac
+done
+exec zig cc "$@"

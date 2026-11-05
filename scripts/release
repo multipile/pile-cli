@@ -1,0 +1,160 @@
+#!/bin/sh
+# Cross-compile the commit that a v<version> tag points at, and publish it as
+# that release of this repository on GitHub. Run it from the root,
+# under mise, with a clean tree at the tagged commit, and with RELEASE_TOKEN
+# set to a token that can write releases. CI runs it after the check on every v* tag
+# pushed. scripts/tag is what pushes them.
+#
+# The tag is the one named on the command line. Otherwise it is the tag CI
+# was started by, and otherwise the one v* tag at HEAD. The version is the
+# tag without its v, and `pile version` prints it first. A tag pushed by hand
+# is released like any other, as long as the version is three numbers.
+#
+# Each platform is a pile-<version>-<os>-<arch>.tar.gz holding one file,
+# pile. That is the shape mise's github backend picks for the machine that
+# asks, and installs without being told the binary's name. SHA256SUMS lists
+# every archive.
+#
+# The release's page says only which commit it was built from. Release notes
+# are not part of this repository yet.
+#
+# The release is made as a draft, filled, and only then published. It is
+# published only when every platform built: a release with a platform
+# missing is no release. A run that fails halfway deletes its draft and
+# leaves the tag, so running it again releases the same version. A run
+# that was killed cannot delete its draft, so each run first deletes any
+# draft of its tag that an earlier run left. A tag that already has a
+# release is left alone, and so is one that GitHub could not say about:
+# only a "not found" means the tag is not released yet.
+set -eu
+: "${RELEASE_TOKEN:?RELEASE_TOKEN must be a token that can write releases}"
+server=${GITHUB_SERVER_URL:-https://github.com}
+repo=${GITHUB_REPOSITORY:-multipile/pile-cli}
+platforms="darwin/arm64 darwin/amd64 linux/arm64 linux/amd64"
+api="${GITHUB_API_URL:-https://api.github.com}/repos/$repo"
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "the working tree is not HEAD; a release is made of a commit" >&2
+  exit 1
+fi
+commit=$(git rev-parse HEAD)
+
+tag=${1:-}
+if [ -z "$tag" ]; then
+  case ${GITHUB_REF:-} in
+    refs/tags/*) tag=${GITHUB_REF#refs/tags/} ;;
+  esac
+fi
+if [ -z "$tag" ]; then
+  tag=$(git tag --points-at HEAD --list 'v*')
+  case $tag in
+    "")
+      echo "HEAD has no v* tag; scripts/tag is what claims one" >&2
+      exit 1 ;;
+    *"
+"*)
+      echo "HEAD has more than one v* tag; name the one to release:" $tag >&2
+      exit 1 ;;
+  esac
+fi
+version=${tag#v}
+if [ "$tag" = "$version" ] || ! printf '%s\n' "$version" |
+  grep -Eqx '(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'; then
+  echo "$tag is not v followed by three numbers, which is how a release is named" >&2
+  exit 1
+fi
+if [ "$(git rev-parse -q --verify "refs/tags/$tag^{commit}" || true)" != "$commit" ]; then
+  echo "$tag is not a tag on HEAD; check it out and run this again" >&2
+  exit 1
+fi
+
+request() {
+  curl -sS -H "Authorization: Bearer $RELEASE_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" "$@"
+}
+call() {
+  request -f "$@"
+}
+# A draft is not found here: GitHub finds a tag's published release only.
+status=$(request -o /dev/null -w '%{http_code}' "$api/releases/tags/$tag") || :
+case $status in
+  200)
+    echo "$tag is already released"
+    exit 0 ;;
+  404) ;;
+  *)
+    echo "GitHub answered $status when asked whether $tag is released; nothing was changed" >&2
+    exit 1 ;;
+esac
+
+dist=$(mktemp -d "${TMPDIR:-/tmp}/pile-release-XXXXXX")
+id=
+cleanup() {
+  rm -rf "$dist"
+  if [ -n "$id" ]; then
+    echo "deleting the draft of $tag" >&2
+    call -X DELETE "$api/releases/$id" >/dev/null || true
+  fi
+}
+trap cleanup EXIT
+
+# scripts/cross runs on its own, not into a pipe, so that set -e stops here
+# when any platform fails to build.
+PLATFORMS=$platforms VERSION=$version scripts/cross >"$dist/built"
+while read -r out; do
+  name=${out#bin/pile-}
+  mkdir "$dist/$name"
+  cp "$out" "$dist/$name/pile"
+  tar -czf "$dist/pile-$version-$name.tar.gz" -C "$dist/$name" pile
+  rm -rf "${dist:?}/$name"
+done <"$dist/built"
+rm "$dist/built"
+for platform in $platforms; do
+  archive=pile-$version-${platform%/*}-${platform#*/}.tar.gz
+  if [ ! -f "$dist/$archive" ]; then
+    echo "$archive was not built; nothing was published" >&2
+    exit 1
+  fi
+done
+(cd "$dist" && if command -v sha256sum >/dev/null; then sha256sum ./*.tar.gz
+  else shasum -a 256 ./*.tar.gz; fi | sed 's| \./| |' >SHA256SUMS)
+
+# The ids are all read before any is deleted, so that a deletion cannot
+# move a draft onto a page already read.
+stale=
+page=1
+while :; do
+  releases=$(call "$api/releases?per_page=100&page=$page")
+  if [ "$(printf '%s' "$releases" | jq length)" -eq 0 ]; then
+    break
+  fi
+  stale="$stale $(printf '%s' "$releases" | jq -r --arg tag "$tag" \
+    '.[] | select(.draft and .tag_name == $tag) | .id')"
+  page=$((page + 1))
+done
+for old in $stale; do
+  echo "deleting a draft of $tag that an earlier run left" >&2
+  call -X DELETE "$api/releases/$old" >/dev/null
+done
+
+body=$(jq -n --arg tag "$tag" --arg commit "$commit" '{
+  tag_name: $tag, target_commitish: $commit, name: $tag, draft: true,
+  body: "pile built from \($commit)"
+}')
+# A release's files go to its upload_url, which is on another host than the
+# API and ends in a {?name,label} template.
+created=$(call -X POST -H "Content-Type: application/json" -d "$body" "$api/releases")
+id=$(printf '%s' "$created" | jq -r .id)
+uploads=$(printf '%s' "$created" | jq -r '.upload_url | sub("\\{.*\\}$"; "")')
+
+for file in "$dist"/*; do
+  call -X POST -H "Content-Type: application/octet-stream" \
+    --data-binary "@$file" "$uploads?name=$(basename "$file")" >/dev/null
+  basename "$file"
+done
+
+call -X PATCH -H "Content-Type: application/json" -d '{"draft": false}' \
+  "$api/releases/$id" >/dev/null
+id=
+echo "released $tag at $server/$repo/releases/tag/$tag"
