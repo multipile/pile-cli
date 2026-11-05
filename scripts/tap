@@ -1,0 +1,67 @@
+#!/bin/sh
+# Move the formula in multipile/homebrew-tap to a released version, by a
+# pull request there that merges itself once the tap's checks pass. Run it
+# with the release's tag, after scripts/release published it, with gh on
+# PATH and TAP_TOKEN set to a token that can push to the tap and open pull
+# requests on it. CI runs it after every release, with a token of the tap's
+# GitHub App: the token CI hands a run cannot write to another repository.
+#
+# The tap writes its own formula: its scripts/update-formula takes the
+# version and the release's SHA256SUMS. So this script knows nothing of what
+# a formula holds.
+#
+# Every version goes through one branch, pile-release, pushed with --force,
+# and one pull request from it. A release made while the last one's pull
+# request is still open replaces what that pull request holds, so an older
+# version never merges after a newer one. A version that is not newer than
+# the one on the tap's main changes nothing.
+set -eu
+: "${TAP_TOKEN:?TAP_TOKEN must be a token that can push to the tap}"
+tap=multipile/homebrew-tap
+branch=pile-release
+bot="multipile-tap-bot[bot]"
+bot_email="352750250+multipile-tap-bot[bot]@users.noreply.github.com"
+server=${GITHUB_SERVER_URL:-https://github.com}
+repo=${GITHUB_REPOSITORY:-multipile/pile-cli}
+
+tag=${1:?usage: scripts/tap <tag>}
+version=${tag#v}
+if [ "$tag" = "$version" ] || ! printf '%s\n' "$version" |
+  grep -Eqx '(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'; then
+  echo "$tag is not v followed by three numbers, which is how a release is named" >&2
+  exit 1
+fi
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/pile-tap-XXXXXX")
+trap 'rm -rf "$work"' EXIT
+
+git clone -q --depth 1 "https://x-access-token:$TAP_TOKEN@github.com/$tap.git" "$work/tap"
+current=$(sed -n 's|.*/releases/download/v\([^/]*\)/.*|\1|p' "$work/tap/Formula/pile.rb" | sort -u)
+newest=$(printf '%s\n%s\n' "$current" "$version" | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
+if [ "$current" = "$version" ] || [ "$newest" != "$version" ]; then
+  echo "the tap already has pile $current; $tag changes nothing there"
+  exit 0
+fi
+
+curl -fsSL -o "$work/SHA256SUMS" "$server/$repo/releases/download/$tag/SHA256SUMS"
+"$work/tap/scripts/update-formula" "$version" "$work/SHA256SUMS"
+
+cd "$work/tap"
+git switch -q -c "$branch"
+# The commit is the App's, by its bot user, whoever runs this: no person's
+# address goes into the tap.
+git -c user.name="$bot" -c user.email="$bot_email" commit -q -am "pile $version"
+git push -q --force origin "$branch"
+
+export GH_TOKEN="$TAP_TOKEN"
+title="pile $version"
+body="Moves the formula to [$tag]($server/$repo/releases/tag/$tag)."
+number=$(gh pr list -R "$tap" --head "$branch" --state open --json number --jq '.[0].number // empty')
+if [ -n "$number" ]; then
+  gh pr edit "$number" -R "$tap" --title "$title" --body "$body" >/dev/null
+else
+  gh pr create -R "$tap" --base main --head "$branch" --title "$title" --body "$body" >/dev/null
+  number=$(gh pr list -R "$tap" --head "$branch" --state open --json number --jq '.[0].number')
+fi
+gh pr merge "$number" -R "$tap" --auto --squash
+echo "$tap#$number moves the formula to $tag, and merges once its checks pass"

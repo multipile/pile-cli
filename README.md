@@ -14,7 +14,13 @@ pile doctor     # what every pile is, and what is wrong with any of them
 
 ## Install
 
-Releases are published on GitHub for macOS and Linux, on arm64 and amd64. With [mise](https://mise.jdx.dev):
+Releases are published on GitHub for macOS and Linux, on arm64 and amd64. With [Homebrew](https://brew.sh):
+
+```sh
+brew install multipile/tap/pile
+```
+
+With [mise](https://mise.jdx.dev):
 
 ```sh
 mise use -g github:multipile/pile-cli

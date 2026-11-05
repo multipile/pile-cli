@@ -9,6 +9,9 @@
 # would start nothing. Every job works with that token. The jobs that tag and
 # release ask for contents: write, which covers pushing a tag and writing a
 # release; check only reads.
+#
+# Once a release is published, the tap job moves the formula in
+# multipile/homebrew-tap to it, with scripts/tap.
 name: ci
 
 on:
@@ -101,3 +104,36 @@ jobs:
       - run: scripts/release
         env:
           RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Moves the tap's formula to the release this run published. It follows
+  # whichever release job ran, and the other is skipped. The token that
+  # GitHub hands a run cannot write to another repository, so the job makes
+  # one of the tap's GitHub App, which can write only to the tap. The App's
+  # key is a secret of the homebrew-tap environment, which only main and v*
+  # tags may use. One tap job runs at a time, so releases reach the tap in
+  # order.
+  tap:
+    needs: [tag, release-main, release]
+    if: >-
+      !cancelled() &&
+      (needs.release-main.result == 'success' || needs.release.result == 'success')
+    runs-on: ubuntu-latest
+    environment: homebrew-tap
+    concurrency:
+      group: tap
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - id: token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.TAP_APP_CLIENT_ID }}
+          private-key: ${{ secrets.TAP_APP_PRIVATE_KEY }}
+          owner: multipile
+          repositories: homebrew-tap
+      - run: scripts/tap "$TAG"
+        env:
+          TAG: ${{ needs.tag.outputs.tag || github.ref_name }}
+          TAP_TOKEN: ${{ steps.token.outputs.token }}
