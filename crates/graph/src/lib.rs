@@ -1,6 +1,7 @@
-//! What a repository declares, as the base relations of
-//! design/model/README.md: rows of `node`, `prop`, `edge`, `edge_prop`,
-//! `type`, `type_prop`, `allows`, `at` and `prop_at`.
+//! What a repository declares, as nine base relations: rows of `node`,
+//! `prop`, `edge`, `edge_prop`, `type`, `type_prop`, `allows`, `at` and
+//! `prop_at`. Each row's type below says what one row of it holds, and
+//! [`Relations`] holds them all.
 //!
 //! Every reader of a declaration file produces these rows and nothing else,
 //! so whatever is built on them, a check or a query, never reads a file
@@ -412,9 +413,10 @@ pub(crate) fn finding(
 }
 
 /// Reads every `.toml` file in the `.pile/` of one of these piles, and
-/// checks what it declares (design/model/README.md, sections 3 to 5). A file
-/// in a `.pile/` that is no pile's here is skipped: doctor says what that
-/// directory is.
+/// checks what it declares: the reader in [`toml`] turns each file into
+/// tables, and [`checks`] holds them to the format, in the order its module
+/// gives. A file in a `.pile/` that is no pile's here is skipped: doctor
+/// says what that directory is.
 pub fn declarations(piles: &[&Pile], files: &[Content]) -> Declared {
     let mut findings = Vec::new();
     let mut found = Vec::new();

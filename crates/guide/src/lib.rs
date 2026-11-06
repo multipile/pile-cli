@@ -3,7 +3,7 @@
 //!
 //! A page is a file in pages/, named `<name>.md`. It opens with front matter
 //! between two `+++` lines, written as a pile's config is: one `key = value`
-//! a line, and `#` for a comment.
+//! a line, and a line starting with `#` for a comment.
 //!
 //! - `role` is `start`, `workflow` or `reference`: what the page is for in
 //!   a session. There is one start page, and a bare `pile guide` prints it.

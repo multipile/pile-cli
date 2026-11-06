@@ -17,7 +17,7 @@ pile's links before you change the pile.
 version = "gitpile/1"
 
 [[edges]]
-type = "uses"
+type = "relies-on"
 target = "@ledger"
 title = "records every charge in"
 description = """
@@ -26,7 +26,7 @@ to the database itself.
 """
 
 [[edges]]
-type = "uses"
+type = "relies-on"
 target = "external:postgres"
 title = "keeps its invoices in"
 
