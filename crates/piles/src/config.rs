@@ -1,7 +1,8 @@
 //! A pile's config: the `.pile/config` file that declares it.
 //!
 //! The file is one `key = value` to a line. Whitespace around each is
-//! trimmed, blank lines and `#` comments are skipped, and nothing nests.
+//! trimmed, blank lines and lines starting with `#` are skipped, and nothing
+//! nests. A `#` after a value is part of the value.
 //! There are four keys, each given at most once, and no other:
 //!
 //! - `kind` says the file is a pile's: `gitpile`, or `auxiliary-gitpile` for
@@ -10,9 +11,10 @@
 //! - `id` is 32 lowercase hex characters, minted once ([`new_id`]).
 //! - `name` is the word the pile is typed and shown by. It is optional.
 //!
-//! The config holds only what finds a pile and tells it apart. Anything else
-//! a pile says about itself is given in `[pile]`, in a declaration file
-//! (design/model/README.md).
+//! The config holds only what finds a pile and tells it apart. Its `kind`
+//! and `version` say how it is read, and are not properties of the pile.
+//! Anything else a pile says about itself is given in a `[pile]` table, in
+//! one of the `.toml` declaration files beside the config.
 //!
 //! A file that breaks any of that is refused, never read as no config. Read
 //! as none, it would hand every path under it to the pile above, which is a

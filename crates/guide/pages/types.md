@@ -27,7 +27,7 @@ name = "external"
 title = "something outside the repository that a pile relies on"
 
 [[edge-types]]
-name = "uses"
+name = "relies-on"
 title = "one pile relies on another, or on something outside the repository"
 source = ["pile"]
 target = ["pile", "external"]

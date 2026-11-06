@@ -1,5 +1,7 @@
-//! The checks of what a reader found, and the rows of what passes them
-//! (design/model/README.md, sections 3 to 5).
+//! The checks of what a reader found, and the rows of what passes them. A
+//! check reads only the tables a reader hands it, each header, key and
+//! value with its line and column, and never a file, so the checks are the
+//! same whatever syntax a file is written in.
 //!
 //! The order is the order each part needs the one before it:
 //!

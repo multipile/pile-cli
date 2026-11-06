@@ -1,8 +1,8 @@
 //! What this binary is, stamped at build time.
 //!
-//! scripts/build and scripts/cross set PILE_VERSION, PILE_COMMIT and
-//! PILE_DATE in the environment of the compile, and `option_env!` reads them
-//! here. build.rs tells cargo to rebuild when one of them changes, so a build
+//! scripts/build and scripts/cross set PILE_COMMIT and PILE_DATE in the
+//! environment of the compile, and scripts/cross also sets PILE_VERSION,
+//! from VERSION. `option_env!` reads them here. build.rs tells cargo to rebuild when one of them changes, so a build
 //! cannot leave a stale stamp behind.
 //!
 //! A binary nobody stamped, such as one from a plain `cargo build`, has the

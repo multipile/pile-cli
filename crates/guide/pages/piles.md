@@ -32,7 +32,8 @@ id = 9f8e7d6c5b4a39281706f5e4d3c2b1a0
 name = lib
 ```
 
-A config is one `key = value` a line, and `#` starts a comment.
+A config is one `key = value` a line, and a line starting with `#` is a
+comment. A `#` after a value is part of the value.
 
 - `kind` and `version` say which format the pile is written in.
   `pile init` writes them.

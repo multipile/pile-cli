@@ -1,6 +1,7 @@
 //! The reader of a `.toml` declaration file: its `version`, then each table
 //! by its header, and every key and value with the line and column it is
-//! written at (design/model/README.md, section 4).
+//! written at. Every `.toml` file in a `.pile/` is read the same way,
+//! whatever its name.
 //!
 //! The reader knows TOML and the five headers, and nothing of the types. It
 //! turns a file into [`Table`]s, each what its header declares and the keys
