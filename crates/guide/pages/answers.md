@@ -8,6 +8,12 @@ Every command answers in one of two formats, chosen with `--format`:
 asks for text (`pile guide agent-mode`). The format changes how an answer
 is printed, never what a command does or what it exits with.
 
+`pile gitdiff` also answers in a third format, `markdown`, for a person who
+reads the answer where Markdown is rendered, such as a comment on a pull
+request. Every other command refuses `--format markdown` with
+`format-not-answered`, before it does anything. A refusal in `markdown` is
+printed as it is in text.
+
 ## A json answer is one envelope
 
 A command prints one object on stdout, the envelope, and nothing else:

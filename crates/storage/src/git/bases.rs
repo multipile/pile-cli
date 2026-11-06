@@ -5,7 +5,7 @@
 //! `git fetch`.
 
 use super::{FORMAT, Git, parse};
-use crate::{Base, BaseRole, Bases, Error, Result, RevisionInfo, Storage as _};
+use crate::{Base, BaseRole, Bases, Error, Result, Revision, RevisionInfo, Storage as _};
 
 pub(super) fn read(git: &Git, recent: usize) -> Result<Bases> {
     let Some(head) = git.head()? else {
@@ -58,7 +58,7 @@ pub(super) fn read(git: &Git, recent: usize) -> Result<Bases> {
     };
     let fork = match (&main, &branch) {
         (Some(main), Some(branch)) if !same_branch(&main.name, branch, &remote) => {
-            fork_point(git, main)?
+            fork_point(git, main, &head)?
         }
         _ => None,
     };
@@ -102,20 +102,14 @@ fn same_branch(main: &str, branch: &str, remote: &str) -> bool {
 
 /// Where the head's history left the main branch's: their merge base,
 /// named after the main branch. None when the two share no revision.
-fn fork_point(git: &Git, main: &Base) -> Result<Option<Base>> {
-    let Ok(out) = git.git(&[
-        "merge-base",
-        "--end-of-options",
-        main.info.revision.as_str(),
-        "HEAD",
-    ]) else {
+fn fork_point(git: &Git, main: &Base, head: &Revision) -> Result<Option<Base>> {
+    let Some(id) = git.merge_base(&main.info.revision, head)? else {
         return Ok(None);
     };
-    let id = String::from_utf8_lossy(&out).trim().to_string();
     Ok(Some(Base {
         name: main.name.clone(),
         role: BaseRole::ForkPoint,
-        info: info(git, &id)?,
+        info: info(git, id.as_str())?,
     }))
 }
 

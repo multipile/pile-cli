@@ -14,6 +14,7 @@ pile which <path>           # the pile a path is in, its headline and links
 pile files <pile>           # one pile's own files, and how long each is
 pile status                 # what changed since the last commit, by pile
 pile status --all --brief   # a line per pile, for the whole repository
+pile gitdiff <a>...<b>      # what b changed since it left a, by pile
 pile log <pile>             # the commits that changed one pile
 pile doctor                 # what is wrong with any pile
 ```
@@ -50,6 +51,15 @@ pile, and does not widen what is reported. So inside a child pile,
 A change that crossed a boundary shows in both piles, so read status with
 `--all` even when you changed one pile. `git diff` is still how you read
 the lines that changed.
+
+## `gitdiff` is git diff, read by pile
+
+`pile status` is what changed since the last commit. `pile gitdiff` is
+what changed between any two revisions, named as `git diff` names them:
+one revision against the working copy, two spaced or as `a..b`, or
+`a...b`, from where b left a. A branch read as a pull request into main
+is `pile gitdiff main...HEAD`. Each changed pile comes with its intent's
+headline, and says when the change rewrote its intent.
 
 ## `log` is a pile's own history
 

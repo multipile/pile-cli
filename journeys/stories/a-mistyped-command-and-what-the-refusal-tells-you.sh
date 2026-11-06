@@ -29,7 +29,7 @@ refuses show one two
 exits 2 "two piles for a command that takes one is a usage refusal"
 says "pile show takes one pile at most, and was given 2" "saying how many it takes"
 refuses list --format yaml
-says "--format is text or json, not \"yaml\"" "a format that is not one names the ones there are"
+says "--format is text, json or markdown, not \"yaml\"" "a format that is not one names the ones there are"
 
 say "III. a name that is not one, and the names that are"
 

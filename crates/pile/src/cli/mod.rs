@@ -40,6 +40,7 @@ macro_rules! putln {
 mod complete;
 mod doctor;
 mod files;
+mod gitdiff;
 mod guide;
 mod id;
 mod init;
@@ -95,7 +96,8 @@ const REFUSALS: &str = "\
 Refusals any command can give:
   unknown-command          2  pile has no such command: pile --help lists them
   unknown-flag             2  the command has no such flag: its --help lists them
-  unknown-format           2  --format is text or json
+  unknown-format           2  --format is text, json or markdown
+  format-not-answered      2  only pile gitdiff answers in markdown: use text or json
   usage                    2  the command cannot take what was typed: its --help
 
 Refusals any command reading a repository can give:
@@ -128,6 +130,7 @@ pub fn command() -> Command {
         .subcommand(one_help(with_help(which::command())))
         .subcommand(one_help(with_help(files::command())))
         .subcommand(one_help(with_help(status::command())))
+        .subcommand(one_help(with_help(gitdiff::command())))
         .subcommand(one_help(with_help(log::command())))
         .subcommand(one_help(with_help(doctor::command())))
         .subcommand(one_help(with_help(guide::command())))
@@ -136,10 +139,13 @@ pub fn command() -> Command {
         .arg(
             Arg::new("format")
                 .long("format")
-                .value_name("text|json")
+                .value_name("text|json|markdown")
                 .global(true)
                 .help_heading("Flags")
-                .help("how the answer is printed: text, or json (the default for an agent)"),
+                .help(
+                    "how the answer is printed: text, json (the default for an agent), \
+                     or markdown (pile gitdiff only)",
+                ),
         )
         .disable_help_subcommand(true)
         .subcommand(help_command());
@@ -233,6 +239,13 @@ pub fn execute() -> i32 {
 
 /// Runs the command asked for.
 fn dispatch(matches: &ArgMatches, out: &mut Out, mode: Mode) -> Result {
+    if mode.format == answer::Format::Markdown
+        && let Some((name, _)) = matches.subcommand()
+        && name != "help"
+        && !answer::MARKDOWN.contains(&name)
+    {
+        return Err(answer::no_markdown(&format!("pile {name}")));
+    }
     match matches.subcommand() {
         Some(("init", m)) => init::run(m, out),
         Some(("set", m)) => set::run(m, out),
@@ -242,6 +255,7 @@ fn dispatch(matches: &ArgMatches, out: &mut Out, mode: Mode) -> Result {
         Some(("which", m)) => which::run(m, out),
         Some(("files", m)) => files::run(m, out),
         Some(("status", m)) => status::run(m, out),
+        Some(("gitdiff", m)) => gitdiff::run(m, out),
         Some(("log", m)) => log::run(m, out),
         Some(("doctor", m)) => doctor::run(m, out),
         Some(("guide", m)) => guide::run(m, out),
@@ -252,7 +266,8 @@ fn dispatch(matches: &ArgMatches, out: &mut Out, mode: Mode) -> Result {
         // An agent is asking where it is, and inside a repository that
         // declares piles it is told.
         _ => {
-            if mode.agent.is_some() && orient(out, mode)? {
+            if mode.agent.is_some() && mode.format != answer::Format::Markdown && orient(out, mode)?
+            {
                 return Ok(());
             }
             help(None, out)

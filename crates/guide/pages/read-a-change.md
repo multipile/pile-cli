@@ -2,7 +2,7 @@
 role = workflow
 summary = read what a change touched, pile by pile, against each intent
 needs = reading
-see = commit-a-change write-an-intent links
+see = review commit-a-change write-an-intent links
 +++
 ## When to use
 
@@ -13,19 +13,23 @@ fixes nothing.
 
 ## What to have first
 
-- Where the change is: the working copy, or the commits, by their ids.
+- Where the change is: the working copy, a branch and the branch it goes
+  into, or the commits, by their ids.
 
 ## Steps
 
-### 1. See which piles the working copy changed
+### 1. See which piles the change touched
 
 ```sh
-pile status --all
+pile gitdiff <base>...HEAD   # a branch, or a pull request, against its base
+pile status --all            # the working copy alone
 ```
 
 Look for a block per pile, each path with its letter. A path that moved
 from one pile to another shows in both. A path under `in no pile` is in no
-pile. A pile marked `unchanged` is one the change did not touch.
+pile. `pile gitdiff` lists only the changed piles, each with its intent's
+headline, and marks a pile whose intent the change rewrote. `pile status`
+marks a pile the change did not touch `unchanged`.
 
 ### 2. For commits, see which piles each one changed
 
@@ -55,6 +59,7 @@ add, change or remove a link: read the piles at both its ends.
 
 ```sh
 git diff
+git diff <base>...HEAD
 git show <commit>
 ```
 

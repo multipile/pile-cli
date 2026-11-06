@@ -46,7 +46,7 @@ say "II. it finds the workflow, and reads it whole"
 
 pp guide --list
 field '[.result.pages[] | select(.role == "workflow") | .name] | join(" ")' \
-	"adopt commit-a-change read-a-change start-a-change write-an-intent" \
+	"adopt commit-a-change read-a-change review start-a-change write-an-intent" \
 	"the list gives the workflows a role of their own"
 pp guide adopt
 adopt=$stdout

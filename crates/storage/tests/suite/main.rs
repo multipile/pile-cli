@@ -39,4 +39,5 @@ every_backend!(
     a_revision_says_who_made_it_when_and_why,
     a_revision_resolves_by_its_own_id,
     the_bases_start_at_the_head_and_go_back_along_its_branch,
+    the_merge_base_of_two_revisions_on_one_line_is_the_older,
 );

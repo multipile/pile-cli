@@ -19,6 +19,12 @@
 //! In text, a refusal goes to stderr after `pile:`. In a structured format it
 //! is the envelope on stdout, and stderr stays empty.
 //!
+//! Markdown is a third format, and not a structured one. It is for a person
+//! reading the answer where Markdown is rendered, such as a comment on a
+//! pull request. A command that answers in it writes its Markdown beside its
+//! text, and is named in [`MARKDOWN`]. A refusal in Markdown is printed as it
+//! is in text.
+//!
 //! Some answers are text in every format, because an envelope would stand
 //! between them and their reader: help, and a value meant to be typed into
 //! another program, such as `version --short` or a completion script. A
@@ -39,19 +45,25 @@ use crate::exit::{self, Code, Next, Refusal};
 pub enum Format {
     Text,
     Json,
+    Markdown,
 }
 
 impl Format {
-    pub const NAMES: &[&str] = &["text", "json"];
+    pub const NAMES: &[&str] = &["text", "json", "markdown"];
 
     fn parse(s: &str) -> Option<Format> {
         match s {
             "text" => Some(Format::Text),
             "json" => Some(Format::Json),
+            "markdown" => Some(Format::Markdown),
             _ => None,
         }
     }
 }
+
+/// The commands that answer in Markdown. Every other command refuses
+/// `--format markdown` before it does anything.
+pub const MARKDOWN: &[&str] = &["gitdiff"];
 
 /// The variables that say an agent is running `pile`, in the order they are
 /// read. The first one set to anything but the empty string turns agent mode
@@ -154,6 +166,9 @@ pub struct Out {
     pub next: Vec<Next>,
     /// The answer is printed as text in every format.
     pub raw: bool,
+    /// The answer as Markdown, which the markdown format prints. None for a
+    /// command that does not answer in Markdown.
+    pub markdown: Option<String>,
 }
 
 impl Out {
@@ -262,13 +277,17 @@ pub struct Printed {
 /// whole of the difference between the formats, and between a person and an
 /// agent.
 pub fn finish(mode: Mode, command: &str, mut out: Out, result: Result<(), Refusal>) -> Printed {
-    let structured = mode.format != Format::Text;
+    let structured = mode.format == Format::Json;
     let text = std::mem::take(&mut out.text);
     let refusal = match result {
         Ok(()) => {
-            let stdout = if structured && !out.raw {
+            let stdout = if out.raw {
+                text
+            } else if structured {
                 let result = out.result.unwrap_or(Value::Null);
                 render(&envelope(command, Some(result), None, &out.next))
+            } else if mode.format == Format::Markdown {
+                out.markdown.unwrap_or(text)
             } else {
                 text
             };
@@ -319,7 +338,20 @@ pub fn finish(mode: Mode, command: &str, mut out: Out, result: Result<(), Refusa
 pub fn unknown_format(bad: &str) -> Refusal {
     Refusal::new(
         Code::UnknownFormat,
-        format!("--format is {}, not {bad:?}", Format::NAMES.join(" or ")),
+        format!("--format is text, json or markdown, not {bad:?}"),
+    )
+}
+
+/// The refusal for `--format markdown` given to a command that does not
+/// answer in it.
+pub fn no_markdown(command: &str) -> Refusal {
+    let only: Vec<String> = MARKDOWN.iter().map(|c| format!("pile {c}")).collect();
+    Refusal::new(
+        Code::FormatNotAnswered,
+        format!(
+            "{command} answers in text or json, and only {} answers in markdown",
+            only.join(" and ")
+        ),
     )
 }
 
