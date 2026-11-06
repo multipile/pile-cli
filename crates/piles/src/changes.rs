@@ -86,6 +86,13 @@ impl Group<'_> {
     pub fn crossed(&self) -> usize {
         self.entries.iter().filter(|e| e.crossed).count()
     }
+
+    /// The change wrote the pile's intent: added it, changed it, removed
+    /// it, or moved it here.
+    pub fn intent_written(&self) -> bool {
+        let intent = self.pile.intent_path();
+        self.entries.iter().any(|e| e.path == intent)
+    }
 }
 
 /// The changes, arranged.

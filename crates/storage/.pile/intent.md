@@ -3,7 +3,8 @@ no command knows which backend answers it.
 
 The interface names what a command needs to know, not how git finds it
 out: the piles' files and the files under a path, in the working copy or
-at a revision, what changed, and which revisions changed it. A revision
+at a revision, what changed, which revisions changed it, and where two
+revisions' histories parted. A revision
 is an id the backend chose, and nothing outside the backend reads into
 it. Nothing here writes, because `pile` makes no commit. The backends
 belong here too, with the suite every backend has to pass, and one

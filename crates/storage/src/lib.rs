@@ -472,6 +472,12 @@ pub trait Storage {
     /// The revisions a base is chosen from, with at most `recent` of the
     /// head's own branch.
     fn bases(&self, recent: usize) -> Result<Bases>;
+
+    /// The newest revision both a and b were made on top of: where their
+    /// histories parted. Either one, when one was made on top of the other.
+    /// None when they share no revision. Where several are equally new, the
+    /// backend picks one.
+    fn merge_base(&self, a: &Revision, b: &Revision) -> Result<Option<Revision>>;
 }
 
 /// The storage for the repository that encloses dir.

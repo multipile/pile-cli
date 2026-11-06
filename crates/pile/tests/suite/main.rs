@@ -15,6 +15,7 @@ mod completion;
 mod declare;
 mod doctor;
 mod files;
+mod gitdiff;
 mod guide;
 mod links;
 mod list;

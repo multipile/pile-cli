@@ -398,3 +398,16 @@ pub fn the_bases_start_at_the_head_and_go_back_along_its_branch(f: &mut dyn Fixt
         }
     }
 }
+
+pub fn the_merge_base_of_two_revisions_on_one_line_is_the_older(f: &mut dyn Fixture) {
+    f.write("/a", "1");
+    let r1 = f.commit("one");
+    f.write("/a", "2");
+    let r2 = f.commit("two");
+    f.write("/a", "3");
+    let r3 = f.commit("three");
+    let s = f.storage();
+    assert_eq!(s.merge_base(&r1, &r3).unwrap(), Some(r1.clone()));
+    assert_eq!(s.merge_base(&r3, &r1).unwrap(), Some(r1));
+    assert_eq!(s.merge_base(&r2, &r2).unwrap(), Some(r2));
+}

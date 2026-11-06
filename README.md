@@ -7,6 +7,7 @@ pile guide      # how to work in a repository of piles: start here
 pile list       # every pile the repository declares
 pile show       # one pile whole: its config, where it sits, its intent
 pile status     # what changed since the last commit, by pile
+pile gitdiff    # what changed between two revisions, by pile, as git diff names them
 pile doctor     # what every pile is, and what is wrong with any of them
 ```
 

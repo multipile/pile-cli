@@ -411,6 +411,21 @@ impl Storage for Memory {
         Ok(history)
     }
 
+    fn merge_base(&self, a: &Revision, b: &Revision) -> Result<Option<Revision>> {
+        let a = self
+            .index(a)
+            .ok_or_else(|| Error::UnknownRevision(a.to_string()))?;
+        let b = self
+            .index(b)
+            .ok_or_else(|| Error::UnknownRevision(b.to_string()))?;
+        let behind_a: HashSet<usize> = self.back_from(Some(a)).into_iter().collect();
+        Ok(self
+            .back_from(Some(b))
+            .into_iter()
+            .find(|i| behind_a.contains(i))
+            .map(|i| self.revisions[i].info.revision.clone()))
+    }
+
     fn bases(&self, recent: usize) -> Result<Bases> {
         let Some(head) = self.head else {
             return Ok(Bases::default());

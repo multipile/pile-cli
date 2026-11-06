@@ -2,7 +2,7 @@
 role = start
 summary = where a session begins, and how to read the rest of the guide
 needs = piles paths
-see = adopt start-a-change write-an-intent commit-a-change read-a-change reading intent boundaries doctor declarations types aux links answers agent-mode
+see = adopt start-a-change write-an-intent commit-a-change read-a-change review reading intent boundaries doctor declarations types aux links answers agent-mode
 +++
 This is `pile guide`: pages of prose that the `pile` binary carries, about
 the binary that printed them. Read this page and the two printed under it
@@ -46,6 +46,7 @@ Print it, and follow it in order. Do not carry one out from memory.
   question, or no longer true.
 - `pile guide commit-a-change`: before every commit.
 - `pile guide read-a-change`: a change somebody made, read pile by pile.
+- `pile guide review`: a pull request, held to its task and each intent.
 
 ## Read a reference page when it applies
 

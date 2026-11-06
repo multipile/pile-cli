@@ -55,8 +55,12 @@ codes! {
     UnknownCommand = "unknown-command", USAGE;
     /// The command does not take the flag.
     UnknownFlag = "unknown-flag", USAGE;
-    /// `--format` was given something other than `text` or `json`.
+    /// `--format` was given something other than `text`, `json` or
+    /// `markdown`.
     UnknownFormat = "unknown-format", USAGE;
+    /// `--format markdown` was given to a command that does not answer in
+    /// Markdown.
+    FormatNotAnswered = "format-not-answered", USAGE;
     /// Any other invocation the command cannot take.
     Usage = "usage", USAGE;
     /// The command reads a repository, and was run outside one.
@@ -107,6 +111,9 @@ codes! {
     InvalidCount = "invalid-count", USAGE;
     /// `guide` was given a name that is no page of the guide.
     UnknownPage = "unknown-page", USAGE;
+    /// `gitdiff` was given `a...b`, and a and b share no revision, so
+    /// there is no merge base to compare from.
+    NoSharedHistory = "no-shared-history", FAILURE;
     /// `doctor` found a problem. The report is the result, whole.
     ProblemsFound = "problems-found", FAILURE;
     /// A `.pile/` file could not be written. The message says which, and

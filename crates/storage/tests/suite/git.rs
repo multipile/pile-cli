@@ -198,6 +198,27 @@ fn on_another_branch_the_fork_point_is_where_it_left_main() {
 }
 
 #[test]
+fn the_merge_base_of_two_branches_is_where_they_parted_and_none_without_one() {
+    let mut r = GitRepo::new();
+    r.write("/a", "1");
+    let parted = r.commit("one");
+    r.git(&["switch", "-q", "-c", "work"]);
+    r.write("/a", "2");
+    let work = r.commit("on work");
+    r.git(&["switch", "-q", "main"]);
+    r.write("/b", "3");
+    let main = r.commit("on main");
+    let s = r.storage();
+    assert_eq!(s.merge_base(&main, &work).unwrap(), Some(parted.clone()));
+    assert_eq!(s.merge_base(&work, &main).unwrap(), Some(parted));
+
+    r.git(&["switch", "-q", "--orphan", "alone"]);
+    r.write("/c", "4");
+    let alone = r.commit("a history of its own");
+    assert_eq!(r.storage().merge_base(&alone, &main).unwrap(), None);
+}
+
+#[test]
 fn the_upstream_and_the_remote_main_branch_come_from_the_refs() {
     let mut upstream = GitRepo::new();
     upstream.write("/a", "1");

@@ -215,3 +215,28 @@ fn standing_in_a_pile_scopes_the_piles_and_what_is_in_no_pile() {
     assert_eq!(narrow.groups[0].entries.len(), 1);
     assert!(narrow.in_no_pile.is_empty());
 }
+
+#[test]
+fn a_change_to_a_piles_intent_is_its_intent_written() {
+    let s = discover(&repository(), &State::Working).unwrap();
+    let changes = [
+        Change::new("/lib/.pile/intent.md", ChangeKind::Modified),
+        Change::new("/lib/sub/.pile/notes.md", ChangeKind::Added),
+        Change::new("/lib-v2/intent.md", ChangeKind::Added),
+    ];
+    let v = arrange(&s, "/", &changes);
+    let written: Vec<(&str, bool)> = v
+        .groups
+        .iter()
+        .map(|g| (g.pile.path.as_str(), g.intent_written()))
+        .collect();
+    assert_eq!(
+        written,
+        [
+            ("/", false),
+            ("/lib", true),
+            ("/lib-v2", false),
+            ("/lib/sub", false)
+        ]
+    );
+}

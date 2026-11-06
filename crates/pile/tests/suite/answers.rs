@@ -93,7 +93,10 @@ fn a_format_that_is_not_one_is_refused_listing_them() {
     let r = Repo::new();
     let a = r.answered(&[], &["version", "--format", "yaml"]);
     assert_eq!(a.code, 2);
-    assert_eq!(a.stderr, "pile: --format is text or json, not \"yaml\"\n");
+    assert_eq!(
+        a.stderr,
+        "pile: --format is text, json or markdown, not \"yaml\"\n"
+    );
 }
 
 #[test]
@@ -128,7 +131,11 @@ fn help_is_text_in_every_format_and_exits_0() {
         );
     }
     let out = r.stdout(&["version", "--help"]);
-    contains!(out, "Usage: pile version [--short]", "--format <text|json>");
+    contains!(
+        out,
+        "Usage: pile version [--short]",
+        "--format <text|json|markdown>"
+    );
 }
 
 #[test]

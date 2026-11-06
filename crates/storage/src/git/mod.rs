@@ -538,6 +538,22 @@ impl Storage for Git {
     fn bases(&self, recent: usize) -> Result<Bases> {
         bases::read(self, recent)
     }
+
+    fn merge_base(&self, a: &Revision, b: &Revision) -> Result<Option<Revision>> {
+        // merge-base exits 1, and prints nothing, when the two share no
+        // commit. Every other failure exits 128, and says why.
+        let out = command(&self.top, self.alone)
+            .args(["merge-base", "--end-of-options", a.as_str(), b.as_str()])
+            .stdin(Stdio::null())
+            .output()
+            .map_err(spawn_error)?;
+        if out.status.code() == Some(1) && out.stdout.is_empty() {
+            return Ok(None);
+        }
+        let out = finish(&["merge-base"], out)?;
+        let id = String::from_utf8_lossy(&out).trim().to_string();
+        Ok((!id.is_empty()).then(|| Revision::new(id)))
+    }
 }
 
 /// The pathspecs for a subtree: its path, and each path it excepts

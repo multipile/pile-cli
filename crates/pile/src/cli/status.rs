@@ -113,7 +113,7 @@ fn result(view: &View, brief: bool) -> Value {
     Value::Object(out)
 }
 
-fn heading(g: &Group) -> Map<String, Value> {
+pub(super) fn heading(g: &Group) -> Map<String, Value> {
     let untracked = g.untracked();
     let mut p = Map::new();
     p.insert("name".into(), name_of(&g.pile.name));
@@ -125,7 +125,7 @@ fn heading(g: &Group) -> Map<String, Value> {
     p
 }
 
-fn entry(e: &Entry) -> Value {
+pub(super) fn entry(e: &Entry) -> Value {
     let or_null = |s: &str| {
         if s.is_empty() {
             Value::Null
@@ -210,7 +210,7 @@ fn report(out: &mut Out, view: &View, brief: bool) {
     putln!(out, "\n{}", total(view));
 }
 
-fn line(out: &mut Out, e: &Entry) {
+pub(super) fn line(out: &mut Out, e: &Entry) {
     put!(out, "   {}  {}", e.letter(), piles::shown(&e.path));
     if e.crossed && !e.to.is_empty() {
         put!(out, "  (left this pile, now {})", piles::shown(&e.to));
