@@ -86,13 +86,25 @@ fn where_there_is_nothing_to_orient_in_a_bare_pile_prints_the_help() {
     let dir = outside();
     let a = answered(dir.path(), &[("AGENT", "1")], &[]);
     assert_eq!(a.code, 0);
-    assert!(a.stdout.starts_with("multipile declares"), "{}", a.stdout);
+    assert!(
+        a.stdout
+            .starts_with("pile \u{2014} https://multipile.dev\n"),
+        "{}",
+        a.stdout
+    );
     let r = Repo::new();
     let b = r.answered(&[("AGENT", "1")], &[]);
-    assert!(b.stdout.starts_with("multipile declares"), "{}", b.stdout);
+    assert!(
+        b.stdout
+            .starts_with("pile \u{2014} https://multipile.dev\n"),
+        "{}",
+        b.stdout
+    );
     let person = crate::piles::nested().answered(&[], &[]);
     assert!(
-        person.stdout.starts_with("multipile declares"),
+        person
+            .stdout
+            .starts_with("pile \u{2014} https://multipile.dev\n"),
         "{}",
         person.stdout
     );

@@ -66,7 +66,7 @@ say "IV. the person in the same shell"
 
 AGENT='' ask
 says "Usage: pile <command>" "an empty variable is a person, and a bare pile prints them the help"
-says "Start with pile guide" "and the help sends them to the guide too"
+says "pile guide adopt | claude" "and the help sends them to the guide too, by an agent"
 AGENT='' ask list
 says "@lib  :/lib" "and a person reads text"
 

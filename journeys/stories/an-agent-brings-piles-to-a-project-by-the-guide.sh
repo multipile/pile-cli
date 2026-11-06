@@ -37,7 +37,7 @@ run_of() { # <step, from 1>
 say "I. the agent arrives, and is sent to the guide"
 
 ask
-says "Start with pile guide" "a bare pile with no pile to say where it is prints the help, which starts at the guide"
+says "pile guide adopt | claude" "a bare pile with no pile to say where it is prints the help, which starts at the adopt workflow"
 pp guide
 field '.result.pages | map(.name) | join(" ")' "start piles paths" "pile guide is the start page, then the pages it needs"
 field '.result.pages[0].text | contains("pile guide adopt")' true "and the start page names the workflow for a project with no pile"

@@ -63,51 +63,22 @@ const TAKES: &str = "says what this command takes";
 /// What every command returns: nothing, or the refusal.
 pub(crate) type Result<T = ()> = std::result::Result<T, Refusal>;
 
-const ABOUT: &str = "multipile declares structure inside a git repository. A pile is a subtree
-with a .pile/ directory that says what it is and why it is one thing.
+/// What a bare pile and pile --help print above the commands: where to find
+/// multipile, and the way in, which is an agent carrying out the guide.
+/// What holds across commands, such as the forms a path is typed in or the
+/// refusals any command can give, is the guide's to say.
+const ABOUT: &str = "pile \u{2014} https://multipile.dev
 
-Start with pile guide. It says how to work in a repository of piles, and it
-carries workflows, each one thing to accomplish, step by step. pile guide
---list lists every page.
+Let an agent drive pile. In a project with no piles yet, hand it the
+adopt workflow and it lays the project out in piles:
 
-pile makes no commit. Git keeps the versions, the content and the history.
-pile writes only the .pile/ files init and set write.
+  pile guide adopt | claude
 
-pile works only inside a repository. A command that takes a pile or a path
-reads each word as exactly one of three forms (pile guide paths):
+In a repository that already has piles:
 
-  a name        @lib, or a bare word such as lib when a pile claims it as its
-                name. A bare word no pile claims is a path.
-  a path        as the shell means it: relative to the directory you are in,
-                or absolute on disk. So /packages/lib is never the
-                repository's.
-  a :/ path     a path from the top of the repository, from anywhere in it:
-                :/packages/lib, and :/ for the top.
-
-With no pile given, a command is about the pile you are in. Every path pile
-prints is a :/ path, so whatever it printed can be pasted back.
-
-An agent that runs pile with no command, inside a repository that declares
-piles, is told where it is instead of this help (pile guide agent-mode).";
-
-/// What the root help says every command may refuse, before it does
-/// anything of its own.
-const REFUSALS: &str = "\
-Refusals any command can give:
-  unknown-command          2  pile has no such command: pile --help lists them
-  unknown-flag             2  the command has no such flag: its --help lists them
-  unknown-format           2  --format is text, json or markdown
-  format-not-answered      2  only pile gitdiff answers in markdown: use text or json
-  usage                    2  the command cannot take what was typed: its --help
-
-Refusals any command reading a repository can give:
-  not-a-repository         1  not inside a git repository: git init makes one
-  no-git                   1  there is no git on PATH: install it
-  storage-failed           1  git failed: the message is what it said
-  unreadable-config        1  a pile's config is wrong: the message names the line
-  unresolvable-path        1  the directory pile runs in is gone: cd somewhere that is
-
-A command's own refusals are listed at the end of its help.";
+  pile guide --agents   the section to open your AGENTS.md with, so every
+                        agent session starts from the guide
+  pile guide            where a session begins, for you or for an agent";
 
 /// The whole command line: every command, its flags and its help. It is a
 /// function rather than a value, because completion builds it again on every
@@ -119,7 +90,6 @@ pub fn command() -> Command {
         .help_template(format!(
             "{ABOUT}\n\nUsage: pile <command> [flags]\n\nCommands:\n{{subcommands}}\n\n\
              Flags:\n{{options}}\n\n\
-             {REFUSALS}\n\n\
              Use \"pile <command> --help\" for more about one command.\n"
         ))
         .subcommand(one_help(with_help(init::command())))

@@ -69,5 +69,23 @@ them is still an envelope.
 ## Where each refusal code is listed
 
 Each command's help ends with the refusals it can give, under
-`Refusals:`, with the exit code and what fixes each. `pile --help` lists
-the refusals any command can give, before it does anything of its own.
+`Refusals:`, with the exit code and what fixes each. Any command can also
+give these, before it does anything of its own:
+
+```text
+unknown-command      2  pile has no such command: pile --help lists them
+unknown-flag         2  the command has no such flag: its --help lists them
+unknown-format       2  --format is text, json or markdown
+format-not-answered  2  only pile gitdiff answers in markdown: use text or json
+usage                2  the command cannot take what was typed: its --help
+```
+
+And any command that reads a repository can give these:
+
+```text
+not-a-repository     1  not inside a git repository: git init makes one
+no-git               1  there is no git on PATH: install it
+storage-failed       1  git failed: the message is what it said
+unreadable-config    1  a pile's config is wrong: the message names the line
+unresolvable-path    1  the directory pile runs in is gone: cd somewhere that is
+```
