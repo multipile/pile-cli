@@ -67,5 +67,5 @@ Print it, and follow it in order. Do not carry one out from memory.
 What a command takes and what it prints is in its help:
 `pile <command> --help`. A page says what holds across commands, and
 points to the help rather than repeating it. Each help ends with the
-refusals that command can give, and `pile --help` lists the ones any
-command can.
+refusals that command can give, and `pile guide answers` lists the ones
+any command can.
