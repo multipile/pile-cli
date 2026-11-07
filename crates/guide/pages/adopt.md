@@ -2,7 +2,7 @@
 role = workflow
 summary = bring piles to a project that declares none yet
 needs = boundaries intent
-see = commit-a-change start
+see = commit-a-change start agent-mode
 +++
 ## When to use
 
@@ -74,11 +74,11 @@ and wait until the person approves them.
 ### 5. Send the next session to the guide
 
 ```sh
-pile guide --agents >> AGENTS.md
+pile guide --agents
 ```
 
-Look for a `## Piles` section at the end of AGENTS.md, or of the file the
-project's harness reads. Move it to the top if the person agrees.
+Write it into each of the project's rules files (`pile guide agent-mode`),
+near the start: at the top if the person agrees, in the first 100 lines.
 
 ### 6. Ask doctor, and make one commit
 
@@ -88,7 +88,7 @@ pile status --all --brief
 ```
 
 Look for doctor exiting 0, and for status to show only the `.pile/`
-directories and the harness file as changed. Commit them with git, in one
+directories and the rules files as changed. Commit them with git, in one
 commit, as the repository's rules say.
 
 ## Done when
@@ -96,8 +96,8 @@ commit, as the repository's rules say.
 - `pile doctor` exits 0, and reports no `intent-unanswered`.
 - Every pile declared is one the person agreed to, and every intent is one
   they approved.
-- The harness file holds what `pile guide --agents` prints.
-- One commit holds every `.pile/` directory and the harness file.
+- Each rules file holds the section in its first 100 lines.
+- One commit holds every `.pile/` directory and the rules files.
 
 ## What to hand back
 

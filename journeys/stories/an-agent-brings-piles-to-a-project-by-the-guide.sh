@@ -5,7 +5,7 @@
 # it out from the top: each step's commands, as the step gives them, then
 # what the step says to look for. Where the workflow stops for the person,
 # the person here agrees at once. It ends where the workflow says it ends:
-# doctor exits 0, AGENTS.md opens with the section, and one commit holds it
+# doctor exits 0, AGENTS.md holds the section, and one commit holds it
 # all. (pile guide --help, pile guide adopt)
 . "$JOURNEY_LIB"
 
@@ -100,10 +100,11 @@ field '[.result.piles[] | .intent] | join(" | ")' \
 
 say "VII. step 5: the next session is sent to the guide"
 
-same "$(run_of 5)" "pile guide --agents >> AGENTS.md" "the step appends the section to AGENTS.md"
+same "$(run_of 5)" "pile guide --agents" "the step prints the section, for the project's rules file"
 ask guide --agents
-printf '%s\n' "$stdout" >>AGENTS.md
-same "$(head -1 AGENTS.md)" "## Piles" "the section is text an agent's json default leaves alone, ready for the file"
+printf '%s\n' "$stdout" >AGENTS.md
+same "$(head -1 AGENTS.md | cut -c1-10)" "## Piles (" "the section is text an agent's json default leaves alone, ready for the file"
+same "$(head -1 AGENTS.md | grep -cE '^## Piles \([0-9]{4}-[0-9]{2}-[0-9]{2}\)$')" 1 "its heading carries the date its text last changed"
 same "$(grep -c 'pile guide' AGENTS.md)" 1 "and it sends the next session to pile guide"
 
 say "VIII. step 6: doctor exits 0, and one commit holds it all"

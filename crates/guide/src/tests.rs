@@ -353,15 +353,24 @@ fn the_commands_a_text_names_are_found_in_code_and_split_as_a_shell_would() {
 }
 
 #[test]
-fn the_section_is_a_heading_and_one_paragraph_that_sends_to_the_guide() {
-    let (heading, body) = SECTION
-        .split_once("\n\n")
-        .expect("a heading, then a paragraph");
+fn the_section_is_a_heading_and_one_block_that_sends_to_the_guide() {
+    let (heading, body) = SECTION.split_once("\n\n").expect("a heading, then a block");
     assert!(heading.starts_with("## ") && !heading.contains('\n'));
+    let date = heading
+        .strip_prefix("## Piles (")
+        .and_then(|d| d.strip_suffix(')'))
+        .expect("the heading is ## Piles (YYYY-MM-DD)");
+    let parts: Vec<&str> = date.split('-').collect();
+    assert!(
+        parts.len() == 3
+            && [4, 2, 2].iter().zip(&parts).all(|(n, p)| p.len() == *n)
+            && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())),
+        "the heading's date is YYYY-MM-DD: {date}"
+    );
     assert!(SECTION.ends_with('\n') && !SECTION.ends_with("\n\n"));
     assert!(
         !body.trim_end().contains("\n\n"),
-        "the section is one paragraph under its heading"
+        "the section is one block under its heading, with no blank line"
     );
     assert!(
         commands(SECTION).iter().any(|c| c == "pile guide"),
