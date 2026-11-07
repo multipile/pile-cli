@@ -87,8 +87,11 @@ no finding, and a review does not list it.
 </details>
 ````
 
-An entry is at most three lines: the pile, the finding and what happened
-in one sentence, the quoted sentence, title or both headlines, and one
-fix. Blocking comes first. With three findings or more, a table goes
-above the entries, a row each: level, pile, finding, fix. With none, the
-first line is the whole review: `**Pile review** · nothing to act on`.
+An entry is at most three lines. The first names the pile and the
+finding, and says what happened in one sentence of at most 20 words.
+The second quotes the sentence, title or headlines it is judged by. The
+third is one fix, as an action, with no reasons. Why goes in the folded
+part, not in the entry. Blocking comes first. With three findings or
+more, a table goes above the entries, a row each: level, pile, finding,
+fix. With none, the first line is the whole review: `**Pile review** ·
+nothing to act on`.
