@@ -54,7 +54,7 @@ Print it, and follow it in order. Do not carry one out from memory.
 - `pile guide intent`: before you write or change an intent.
 - `pile guide boundaries`: when you decide whether a subtree is one pile.
 - `pile guide doctor`: what doctor's findings and severities mean.
-- `pile guide quality`: the words a review judges a change and its piles by.
+- `pile guide quality`: the words a review judges a change by, and its shape.
 - `pile guide declarations`: the `.toml` files in a `.pile/`, and what
   each table in them declares.
 - `pile guide types`: before you write a type, or a node or link of one.

@@ -93,14 +93,7 @@ Look for its exit code, and for findings in the piles the change touched.
 
 ## What to hand back
 
-Findings, and nothing else, each blocking or a question (`pile guide
-quality`). Open with one line that counts them: `Pile review: 1 blocking,
-1 question, 3 piles fine`. Then an entry per finding, blocking first: its
-level, the pile, its two answers, why in one sentence, the quoted
-sentence, title or headlines it is judged by, and one action that fixes
-it. Then one line naming each pile in the task that fits its intent. Then,
-folded, each pile's answers with the sentence that admits each part.
-
-Leave out the table `pile gitdiff` prints, which is posted on its own, and
-doctor unless it found something. With no finding, the first line is the
-whole review. Change nothing, and post only where you were asked to.
+Findings, and nothing else, in the shape `pile guide quality` shows. A
+pile with no finding is not listed. Leave out the `pile gitdiff` table,
+posted on its own, and doctor unless it found something. Change nothing,
+and post only where you were asked to.
