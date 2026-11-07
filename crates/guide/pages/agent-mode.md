@@ -1,6 +1,6 @@
 +++
 role = reference
-summary = how pile knows an agent runs it, and what that changes
+summary = how pile knows an agent runs it, and the rules file that sends it
 see = answers start
 +++
 Agent mode is `pile` knowing that its reader is an agent. It changes how
@@ -42,4 +42,25 @@ AI_AGENT= AGENT= pile status
 
 `pile` writes nothing into a harness: no skill, no hook, and nothing in
 its configuration. What a repository keeps instead is the section
-`pile guide --agents` prints, at the top of its AGENTS.md.
+`pile guide --agents` prints, near the start of its rules file.
+
+## A rules file is what a repository's agents read first
+
+A rules file is a file in a repository that an agent reads at the start of
+every session. Which file depends on the agent:
+
+- `AGENTS.md`, which most agents read, Codex among them;
+- `CLAUDE.md` for Claude Code, and `GEMINI.md` for Gemini CLI;
+- `.github/copilot-instructions.md` for GitHub Copilot;
+- a rule in `.cursor/rules/` for Cursor, with `alwaysApply: true`.
+
+The section goes in each rules file the repository keeps, near its start:
+at the top where the person agrees, and always in its first 100 lines, so
+that an agent reads it before much else. A file that only points to
+another, as a `CLAUDE.md` that holds `@AGENTS.md`, gets nothing: the file
+it points to gets the section. A repository with no rules file gets the
+one the agent you are reads.
+
+The section's heading carries the date its text last changed:
+`## Piles (2026-11-07)`. A rules file whose `## Piles` section has an older
+date, or none, gets the section `pile guide --agents` prints in its place.

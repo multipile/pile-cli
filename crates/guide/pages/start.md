@@ -15,7 +15,7 @@ pile guide                  # this page, and the pages it needs
 pile guide adopt            # one page, and the pages it needs
 pile guide intent doctor    # several pages, each printed once
 pile guide --list           # every page, a line each
-pile guide --agents         # the section an AGENTS.md opens with
+pile guide --agents         # the section for a rules file
 ```
 
 A page has a name, and no number. Under each page are its references,

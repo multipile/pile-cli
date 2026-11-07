@@ -32,9 +32,11 @@ pub(super) fn command() -> Command {
              and hand_back. Each step has title, about, run, the commands to type, and\n\
              look_for. next is the pages the pages asked for name to see.\n\n\
              --list lists every page, a line each, under its role.\n\n\
-             --agents prints the section a repository keeps at the top of the file\n\
-             its agents read first, AGENTS.md or whatever its harness reads. It says\n\
-             that the repository declares piles, and sends a session to the guide.\n\
+             --agents prints the section a repository keeps near the start of its\n\
+             rules file, in its first 100 lines. A rules file is the file its agents\n\
+             read first: AGENTS.md, CLAUDE.md, or whichever its agents read\n\
+             (pile guide agent-mode). It says that the repository declares piles,\n\
+             and sends a session to the guide.\n\
              It is text in every format, so that it can be written into that file.\n\n\
              guide needs no repository, and writes nothing.",
         )
@@ -47,7 +49,7 @@ pub(super) fn command() -> Command {
              pile guide adopt                   a workflow, with the pages it needs\n  \
              pile guide intent doctor           two pages, each printed once\n  \
              pile guide --list                  every page\n  \
-             pile guide --agents >> AGENTS.md   the section, for a repository's agents\n\n\
+             pile guide --agents                the section, for a repository's rules file\n\n\
              Refusals:\n  \
              unknown-page             2  the message lists the pages there are\n  \
              usage                    2  --list and --agents take no page, and not each other",
@@ -61,7 +63,7 @@ pub(super) fn command() -> Command {
         .arg(switch("list", "list every page, a line each"))
         .arg(switch(
             "agents",
-            "print the section an AGENTS.md opens with, as text",
+            "print the section for a rules file, as text",
         ))
 }
 

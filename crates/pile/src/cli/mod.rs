@@ -76,8 +76,9 @@ adopt workflow and it lays the project out in piles:
 
 In a repository that already has piles:
 
-  pile guide --agents   the section to open your AGENTS.md with, so every
-                        agent session starts from the guide
+  pile guide --agents   the section for your rules file, such as AGENTS.md
+                        or CLAUDE.md, near its start, so every agent
+                        session starts from the guide
   pile guide            where a session begins, for you or for an agent";
 
 /// The whole command line: every command, its flags and its help. It is a

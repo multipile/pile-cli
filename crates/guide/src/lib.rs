@@ -68,11 +68,14 @@ pub const WIDEST: usize = 80;
 /// The longest a summary may be, since every list prints it on one line.
 pub const SUMMARY_WIDEST: usize = 72;
 
-/// The section a repository keeps at the top of the file its agents read
-/// first, AGENTS.md or whatever its harness reads: a heading, and one
-/// paragraph that sends a session to `pile guide`. It is the one copy of the
+/// The section a repository keeps near the start of its rules file, the file
+/// its agents read first, such as AGENTS.md or CLAUDE.md: a heading, and one
+/// block with no blank line, a few lines and a short list, that sends a
+/// session to `pile guide`. It is the one copy of the
 /// guide kept on disk, so it says as little as can be said, and names no
-/// page.
+/// page. Its heading carries the date its text last changed, `## Piles
+/// (YYYY-MM-DD)`, so that a copy in a rules file can be told to be older:
+/// change the date with the text.
 pub const SECTION: &str = include_str!("../section.md");
 
 /// Every file in pages/, by name and contents, as build.rs found them.
