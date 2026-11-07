@@ -163,6 +163,25 @@ fn a_move_across_a_boundary_is_a_half_in_each_and_a_rewritten_intent_says_so() {
 }
 
 #[test]
+fn a_rewritten_declaration_file_says_declarations_rewritten() {
+    let r = on_work();
+    r.write(
+        "lib/.pile/links.toml",
+        "[[edges]]\ntype = \"relies-on\"\ntarget = \"@v2\"\ntitle = \"reads what v2 writes\"\n",
+    );
+    r.commit("link");
+    contains!(
+        r.stdout(&["gitdiff", "main..."]),
+        "   intent    The parser, and only the parser.  (declarations rewritten)\n"
+    );
+    let v = r.result(&["gitdiff", "main..."]);
+    assert_eq!(v["piles"][0]["declarations_changed"], true);
+    assert_eq!(v["piles"][0]["intent_changed"], false);
+    let md = r.stdout(&["gitdiff", "main...", "--format", "markdown"]);
+    contains!(md, "only the parser. **Declarations rewritten.** |");
+}
+
+#[test]
 fn a_change_in_no_pile_is_kept() {
     let r = Repo::new();
     r.declare("a", "a", "a");

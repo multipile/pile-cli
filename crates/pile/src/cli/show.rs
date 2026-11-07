@@ -1,9 +1,9 @@
-use clap::{ArgMatches, Command};
+use clap::{Arg, ArgMatches, Command};
 use serde_json::{Map, Value, json};
 
 use graph::{Node, Relations};
 use piles::{Pile, Structure};
-use storage::{State, Subtree};
+use storage::{Revision, State, Subtree};
 
 use super::{
     Out, Result, links, name_of, one_path, open, path_arg, pile_value, plural, say, say_all,
@@ -46,7 +46,8 @@ pub(super) fn command() -> Command {
              pile at neither end. Then its type, the other end (both ends for --)\n    \
              and its title. An end is named as it is typed: @name, type:name, or\n    \
              the path of a pile with no name. A link written in another pile says\n    \
-             so. pile guide links says how a link is written\n  \
+             so. pile guide links says how a link is written. The answer's next\n    \
+             names the aux pile that creates each type the links are of\n  \
              - unread: the files in its .pile/ directory that pile does not read,\n    \
              besides the config, the intent and the .toml files. pile refuses\n    \
              nothing for them. Another program may keep a file there.\n\
@@ -56,15 +57,24 @@ pub(super) fn command() -> Command {
              The parent and children are worked out from the tree on every run.\n\n\
              show judges nothing. A value, a node or a link that does not check is\n\
              left out, and pile doctor says why. --full prints\n\
-             whole ids, which a result always holds.",
+             whole ids, which a result always holds.\n\n\
+             --at <revision> prints the pile as that revision declares it: its\n\
+             config, parent, children, links and intent, read from the revision\n\
+             and not the working copy, under an at line naming it. The pile is\n\
+             named as it is at that revision, and a pile it does not declare is\n\
+             refused. It has no written line, which counts from HEAD. To see how a\n\
+             change rewrote a pile's intent or its links, show the pile at the\n\
+             change's base and again without --at.",
         )
-        .override_usage("pile show [--full] [pile]")
+        .override_usage("pile show [--full] [--at <revision>] [pile]")
         .after_help(format!(
             "Examples:\n  \
              pile show                 the pile you are in\n  \
              pile show :/packages/lib  one named by its path from the top\n  \
-             pile show @lib            one named by its name\n\n\
-             Refusals:\n{}",
+             pile show @lib            one named by its name\n  \
+             pile show @lib --at main  the same pile, as main declares it\n\n\
+             Refusals:\n{}\n  \
+             unknown-revision         2  --at names no revision: git fetch, or name another",
             target::REFUSALS
         ))
         .arg(path_arg())
@@ -72,6 +82,12 @@ pub(super) fn command() -> Command {
             "full",
             "print whole ids rather than the first eight",
         ))
+        .arg(
+            Arg::new("at")
+                .long("at")
+                .value_name("revision")
+                .help("show the pile as this revision declares it, not the working copy"),
+        )
 }
 
 /// The result is the pile, `name`, `path`, `id`, `kind` and `version`;
@@ -94,12 +110,31 @@ pub(super) fn command() -> Command {
 /// (each other property it gives, with a list of its values), `at` and
 /// `written_in` (the pile whose `.pile/` writes it, as it is typed); `unread`, the other files in its `.pile/`, as
 /// the pile names them; and `files`, the intent as `name` and `text`, `text`
-/// being `null` when it is not there.
+/// being `null` when it is not there. With --at, `at` is the revision as
+/// `name` and `revision`, and `written` is `null`; without it, `at` is
+/// `null`.
 pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
     let arg = one_path("show", m)?;
     let full = m.get_flag("full");
     let r = open()?;
-    let s = target::declared(&r)?;
+    let at: Option<(String, Revision)> = match m.get_one::<String>("at") {
+        Some(name) => Some((name.clone(), r.storage().resolve(name)?)),
+        None => None,
+    };
+    let state = match &at {
+        Some((_, rev)) => State::At(rev.clone()),
+        None => State::Working,
+    };
+    let s = match &at {
+        Some(_) => {
+            let s = piles::discover(r.storage(), &state)?;
+            if s.is_empty() {
+                return Err(target::no_piles(&r));
+            }
+            s
+        }
+        None => target::declared(&r)?,
+    };
     let pile = target::chosen(&r, &s, arg.as_deref())?;
     let id = |p: &Pile| {
         if full {
@@ -117,6 +152,20 @@ pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
     result.insert("id".into(), json!(pile.id));
     result.insert("kind".into(), json!(pile.kind));
     result.insert("version".into(), json!(pile.version));
+    if let Some((name, rev)) = &at {
+        say(
+            out,
+            "at",
+            &format!("{name} {}", &rev.as_str()[..rev.as_str().len().min(8)]),
+        );
+    }
+    result.insert(
+        "at".into(),
+        at.as_ref().map_or(
+            Value::Null,
+            |(name, rev)| json!({"name": name, "revision": rev.as_str()}),
+        ),
+    );
 
     let parent = s.parent(&pile.path);
     if let Some(p) = parent {
@@ -136,14 +185,14 @@ pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
     );
 
     let mut written = Value::Null;
-    if pile.intent.is_some() {
+    if pile.intent.is_some() && at.is_none() {
         let (said, value) = written_line(&r, &s, pile)?;
         say(out, "written", &said);
         written = value;
     }
     result.insert("written".into(), written);
 
-    let rows = graph::read(r.storage(), &State::Working)?;
+    let rows = graph::read(r.storage(), &state)?;
     let me = Node::Pile(pile.id.clone());
     let mut values = Map::new();
     for (property, said) in pile_values(&rows, &me) {
@@ -251,7 +300,43 @@ pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
         } else {
             format!("the pile that links to this one: {}", l.of_type)
         };
-        out.next(format!("pile show {other}"), why);
+        let also = at
+            .as_ref()
+            .map(|(name, _)| format!(" --at {name}"))
+            .unwrap_or_default();
+        out.next(format!("pile show {other}{also}"), why);
+    }
+    // Each aux pile that creates a type the links are of, once, with the
+    // types it creates for them.
+    let mut creators: Vec<(&Pile, Vec<&str>)> = Vec::new();
+    for l in &linked {
+        let Some(Node::Pile(home)) = rows.type_of(&l.of_type).map(|t| &t.home) else {
+            continue;
+        };
+        let Some(aux) = s.ordered().into_iter().find(|p| &p.id == home) else {
+            continue;
+        };
+        if aux.id == pile.id {
+            continue;
+        }
+        match creators.iter_mut().find(|(p, _)| p.id == aux.id) {
+            Some((_, kinds)) if kinds.contains(&l.of_type.as_str()) => {}
+            Some((_, kinds)) => kinds.push(&l.of_type),
+            None => creators.push((aux, vec![&l.of_type])),
+        }
+    }
+    for (aux, kinds) in creators {
+        let also = at
+            .as_ref()
+            .map(|(name, _)| format!(" --at {name}"))
+            .unwrap_or_default();
+        out.next(
+            format!("pile show {}{also}", aux.handle()),
+            format!(
+                "the aux pile that creates {}: what a link of it must say, and must not",
+                kinds.join(", ")
+            ),
+        );
     }
 
     let unread: Vec<String> = s

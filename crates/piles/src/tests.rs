@@ -240,3 +240,28 @@ fn a_change_to_a_piles_intent_is_its_intent_written() {
         ]
     );
 }
+
+#[test]
+fn a_change_to_a_piles_toml_is_its_declarations_written() {
+    let s = discover(&repository(), &State::Working).unwrap();
+    let changes = [
+        Change::new("/lib/.pile/links.toml", ChangeKind::Added),
+        Change::new("/lib/sub/.pile/notes.md", ChangeKind::Added),
+        Change::new("/lib-v2/links.toml", ChangeKind::Added),
+    ];
+    let v = arrange(&s, "/", &changes);
+    let written: Vec<(&str, bool)> = v
+        .groups
+        .iter()
+        .map(|g| (g.pile.path.as_str(), g.declarations_written()))
+        .collect();
+    assert_eq!(
+        written,
+        [
+            ("/", false),
+            ("/lib", true),
+            ("/lib-v2", false),
+            ("/lib/sub", false)
+        ]
+    );
+}

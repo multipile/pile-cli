@@ -12,7 +12,7 @@
 
 use storage::{Change, ChangeKind};
 
-use crate::{Pile, Structure, under};
+use crate::{PILE_DIR, Pile, Structure, is_toml, join, under};
 
 /// One change, as one pile sees it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,6 +92,20 @@ impl Group<'_> {
     pub fn intent_written(&self) -> bool {
         let intent = self.pile.intent_path();
         self.entries.iter().any(|e| e.path == intent)
+    }
+
+    /// The change wrote one of the pile's declaration files, the `.toml`
+    /// files in its `.pile/` that hold its links, types and nodes: added
+    /// one, changed one, removed one, or moved one here.
+    pub fn declarations_written(&self) -> bool {
+        let dir = join(&self.pile.path, &[PILE_DIR]);
+        self.entries.iter().any(|e| {
+            is_toml(&e.path)
+                && e.path
+                    .strip_prefix(&dir)
+                    .and_then(|rest| rest.strip_prefix('/'))
+                    .is_some_and(|name| !name.contains('/'))
+        })
     }
 }
 
