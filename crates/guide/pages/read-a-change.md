@@ -28,7 +28,8 @@ pile status --all            # the working copy alone
 Look for a block per pile, each path with its letter. A path that moved
 from one pile to another shows in both. A path under `in no pile` is in no
 pile. `pile gitdiff` lists only the changed piles, each with its intent's
-headline, and marks a pile whose intent the change rewrote. `pile status`
+headline, and marks a pile whose intent or declarations the change
+rewrote. `pile show <pile> --at <base>` shows either as it was. `pile status`
 marks a pile the change did not touch `unchanged`.
 
 ### 2. For commits, see which piles each one changed
@@ -48,8 +49,9 @@ pile show <pile>
 ```
 
 Look for the sentence each part of the change is held to: one that admits
-it, or one it breaks. A pile whose intent the change made untrue needs it
-rewritten in the same change.
+it, one that refuses it, or one it makes untrue. A pile whose intent the
+change made untrue needs it rewritten in the same change. `pile guide
+review` names each of these.
 
 Under `links`, look for each link whose title the change touches, and read
 the pile at its other end too. A changed `.toml` file in a `.pile/` may

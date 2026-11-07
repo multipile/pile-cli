@@ -2,7 +2,7 @@
 role = start
 summary = where a session begins, and how to read the rest of the guide
 needs = piles paths
-see = adopt start-a-change write-an-intent commit-a-change read-a-change review reading intent boundaries doctor declarations types aux links answers agent-mode
+see = adopt start-a-change write-an-intent commit-a-change read-a-change review reading intent boundaries doctor quality declarations types aux links answers agent-mode
 +++
 This is `pile guide`: pages of prose that the `pile` binary carries, about
 the binary that printed them. Read this page and the two printed under it
@@ -54,6 +54,7 @@ Print it, and follow it in order. Do not carry one out from memory.
 - `pile guide intent`: before you write or change an intent.
 - `pile guide boundaries`: when you decide whether a subtree is one pile.
 - `pile guide doctor`: what doctor's findings and severities mean.
+- `pile guide quality`: the words a review judges a change by, and its shape.
 - `pile guide declarations`: the `.toml` files in a `.pile/`, and what
   each table in them declares.
 - `pile guide types`: before you write a type, or a node or link of one.

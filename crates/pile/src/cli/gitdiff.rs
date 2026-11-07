@@ -35,7 +35,9 @@ pub(super) fn command() -> Command {
              As in git diff, an untracked file is not listed: pile status lists it.\n\
              A move from one pile to another is a half in each. A change in no pile\n\
              is printed under in no pile, not dropped. A pile whose intent.md the\n\
-             change wrote says intent rewritten.\n\n\
+             change wrote says intent rewritten, and one whose declaration files\n\
+             (the .toml files in its .pile/, with its links) the change wrote says\n\
+             declarations rewritten: pile show <pile> --at <a> shows them before.\n\n\
              Only the changed piles are listed, and the rest are counted. --all\n\
              lists every pile, in text and json.\n\n\
              --format markdown prints the answer for a pull request comment: its\n\
@@ -158,6 +160,7 @@ impl Ends {
 /// `null`; `to`, the second side, `name` and `revision`, or `null` for the
 /// working copy; `piles`, the changed piles, or every pile with --all, in
 /// path order, each `name`, `path`, `id`, `headline`, `intent_changed`,
+/// `declarations_changed`,
 /// then the counts `changed` and `crossed`, and `entries`, as pile status
 /// gives them. Then `in_no_pile`, as `entries`, and `total`: `piles`, how
 /// many are `changed` and `unchanged`, the `paths` in them, the paths that
@@ -236,6 +239,10 @@ fn result(ends: &Ends, view: &View, all: bool) -> Value {
             }
             p.insert("headline".into(), json!(g.pile.headline()));
             p.insert("intent_changed".into(), json!(g.intent_written()));
+            p.insert(
+                "declarations_changed".into(),
+                json!(g.declarations_written()),
+            );
             for key in ["changed", "crossed"] {
                 p.insert(key.into(), h[key].clone());
             }
@@ -303,6 +310,9 @@ fn report(out: &mut Out, ends: &Ends, view: &View, all: bool) {
         };
         if g.intent_written() {
             intent.push_str("  (intent rewritten)");
+        }
+        if g.declarations_written() {
+            intent.push_str("  (declarations rewritten)");
         }
         say(out, "intent", &intent);
         if !g.changed() {
@@ -402,6 +412,9 @@ fn markdown(ends: &Ends, view: &View) -> String {
         };
         if g.intent_written() {
             purpose += " **Intent rewritten.**";
+        }
+        if g.declarations_written() {
+            purpose += " **Declarations rewritten.**";
         }
         let _ = writeln!(
             md,
