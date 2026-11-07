@@ -7,7 +7,8 @@
 # HEAD left main with HEAD, so what reached main since is not part of the
 # change. It lists only the changed piles, each with its intent's headline,
 # and says when the change rewrote an intent. --format markdown is the
-# comment. (pile gitdiff --help)
+# comment. pile show --at reads a rewritten intent as the base had it.
+# (pile gitdiff --help, pile show --help)
 . "$JOURNEY_LIB"
 
 repo
@@ -78,7 +79,18 @@ refuses status --format markdown
 exits 2 "only gitdiff answers in markdown"
 says "only pile gitdiff answers in markdown" "and the refusal says which does"
 
-say "III. before a commit, and what it refuses"
+say "III. what the branch rewrote, as the base had it"
+
+pp show @db --at origin/main
+says "   at        origin/main " "--at shows the pile as that revision declares it"
+says "The schema every service reads." "so the intent the branch rewrote reads as it was"
+lacks "and its migrations" "and not as the branch left it"
+lacks "written" "with no written line, which counts from HEAD"
+
+pp show @db
+says "The schema every service reads, and its migrations." "without --at, it is the branch's"
+
+say "IV. before a commit, and what it refuses"
 
 write blog/auth/login.ts 'export {}
 '

@@ -1,15 +1,16 @@
 +++
 role = workflow
 summary = review a pull request by pile, against its task and each intent
-needs = reading
-see = read-a-change links boundaries
+needs = reading quality
+see = read-a-change links boundaries intent
 +++
 ## When to use
 
 A branch is to be merged into another, through a pull request or not yet,
 and you are to review it. A list of paths says which files changed. This
-review says which piles changed, what each is for, and whether each
-belongs to the task the branch was made for. It fixes nothing.
+review says, for each pile the branch changed, whether the task needed it
+and whether its intent admits it, and reports only what the author has to
+act on. It fixes nothing.
 
 ## What to have first
 
@@ -37,40 +38,45 @@ base is the branch the work goes into, such as `main`.
 pile gitdiff origin/<base>...HEAD
 ```
 
-Look for a block per changed pile, with the headline of its intent and
-each path with its letter. Three dots compare from where HEAD left the
-base, so what reached the base since is not part of the change. A path
-that moved from one pile to another shows in both. A path under
-`in no pile` is in no pile.
+Look for a block per changed pile, with its intent's headline and each
+path with its letter. `intent rewritten` and `declarations rewritten` mark
+a pile whose intent or links the branch wrote. Three dots compare from
+where HEAD left the base. A path that moved between piles shows in both,
+and one under `in no pile` is in no pile.
 
-### 3. Hold each pile to the task and to its intent
+### 3. Read each changed pile, and answer for it
 
 ```sh
 pile show <pile>
-```
-
-Look for the sentence of the intent each part of the change is held to,
-and quote it. Then give each changed pile one verdict:
-
-- **In the task**: the task needs this pile to change.
-- **Not in the task**: nothing in the task needs it. It is a question for
-  the author, not a verdict that the change is wrong.
-- **Intent untrue**: the change made a sentence untrue, and did not
-  rewrite it.
-
-Under `links`, read the pile at the other end of each link whose title
-the change touches.
-
-### 4. Read the lines
-
-```sh
 git diff origin/<base>...HEAD -- <path>
 ```
 
-Look for what each change does, a pile at a time, now that you know what
-the pile is for and whether the task asked for it.
+Look for the sentence of the intent each part of the change is held to,
+and quote it. Then give the pile its two answers. Read the lines a pile at
+a time, now that you know what the pile is for.
 
-### 5. Ask doctor
+### 4. Compare what the branch rewrote
+
+```sh
+pile show <pile> --at origin/<base>
+```
+
+For a pile marked `intent rewritten`, look for whether the new intent is
+worse than this one (`pile guide quality`). For one marked `declarations
+rewritten`, look for each link the branch added, removed or retitled.
+
+### 5. Hold the links
+
+```sh
+pile show <aux pile>
+```
+
+Look under each changed pile's `links` for each link to or from it, and
+hold it to what the change did. `next` names the aux pile that creates
+each type: show it for the type's `do` and `dont`. Where the change makes
+one pile use another, look for a link that says so.
+
+### 6. Ask doctor
 
 ```sh
 pile doctor
@@ -78,26 +84,23 @@ pile doctor
 
 Look for its exit code, and for findings in the piles the change touched.
 
-### 6. Print the view by pile
-
-```sh
-pile gitdiff origin/<base>...HEAD --format markdown
-```
-
-Look for a table of the changed piles, then each one's paths, folded. It
-opens the review.
-
 ## Done when
 
-- Every changed pile was read whole, and has one verdict.
+- Every changed pile was read whole, and has its two answers.
 - Each part of the change is held to a quoted sentence of its intent.
-- Every path in no pile, and every path that crossed a boundary, is named.
+- Every rewritten intent was compared with its base, and every link to or
+  from a changed pile was held to its type.
 
 ## What to hand back
 
-The table by pile, as it was printed. Then a line per changed pile: its
-verdict, and the sentence of its intent the change is held to, quoted,
-with the piles not in the task and the intents made untrue first. Then
-each link the change touched, the paths in no pile, the paths that crossed
-a boundary, and what doctor reported. Change nothing, and post the review
-only where you were asked to.
+Findings, and nothing else, each blocking or a question (`pile guide
+quality`). Open with one line that counts them: `Pile review: 1 blocking,
+1 question, 3 piles fine`. Then an entry per finding, blocking first: its
+level, the pile, its two answers, why in one sentence, the quoted
+sentence, title or headlines it is judged by, and one action that fixes
+it. Then one line naming each pile in the task that fits its intent. Then,
+folded, each pile's answers with the sentence that admits each part.
+
+Leave out the table `pile gitdiff` prints, which is posted on its own, and
+doctor unless it found something. With no finding, the first line is the
+whole review. Change nothing, and post only where you were asked to.

@@ -138,8 +138,8 @@ ask show @cli --format json
 field '.result.links[0] | "\(.direction) \(.type) \(.other) \(.at)"' \
 	"to uses @storage :/cli/.pile/links.toml:3:1" \
 	"in json, each link has its direction, type, other end and place"
-field '[.next[].command] | join(", ")' "pile show @storage, pile show @journeys" \
-	"and next names each pile at the other end"
+field '[.next[].command] | join(", ")' "pile show @storage, pile show @journeys, pile show @words" \
+	"and next names each pile at the other end, then the aux pile their types come from"
 pp show @top
 says "links     -- uses  @cli -> external:git  asks every question about a repository of  (written in @cli)" \
 	"the top holds external:git, so the link to it is the top's too, with both ends shown"

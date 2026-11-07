@@ -160,3 +160,41 @@ fn an_intent_with_a_heading_and_one_without_have_the_same_headline() {
     assert_eq!(v["piles"][0]["intent"], "The parser, and only the parser.");
     assert_eq!(v["piles"][1]["intent"], v["piles"][0]["intent"]);
 }
+
+#[test]
+fn at_a_revision_show_prints_the_pile_as_that_revision_declares_it() {
+    let r = nested();
+    r.intent("lib", "The parser, and the printer too.\n");
+    r.write(
+        "lib/.pile/links.toml",
+        "[[edges]]\ntype = \"relies-on\"\ntarget = \"@v2\"\ntitle = \"prints what v2 parses\"\n",
+    );
+    r.commit("widen lib");
+    let out = r.stdout(&["show", "@lib", "--at", "HEAD~1"]);
+    let head: Vec<&str> = out.lines().take(3).collect();
+    assert_eq!(head[0], "@lib  :/lib  bbbbbbbb  gitpile/1");
+    assert!(head[1].starts_with("   at        HEAD~1 "), "{out}");
+    assert!(!out.contains("written"), "{out}");
+    assert!(!out.contains("printer"), "{out}");
+    contains!(out, "The parser, and only the parser.\n");
+    let v = r.result(&["show", "@lib", "--at", "HEAD~1"]);
+    assert_eq!(v["at"]["name"], "HEAD~1");
+    assert_eq!(v["at"]["revision"].as_str().unwrap().len(), 40);
+    assert_eq!(v["written"], serde_json::Value::Null);
+    assert_eq!(v["links"], json!([]));
+    // Without --at, the same pile is the working copy's.
+    let v = r.result(&["show", "@lib"]);
+    assert_eq!(v["at"], serde_json::Value::Null);
+    assert!(v["files"][0]["text"].as_str().unwrap().contains("printer"));
+}
+
+#[test]
+fn at_a_revision_a_pile_it_does_not_declare_is_refused() {
+    let r = nested();
+    r.declare("tools", "e", "tools");
+    r.commit("add tools");
+    let v = r.refused(&["show", "@tools", "--at", "HEAD~1"], 1);
+    assert_eq!(v["error"]["code"], "unknown-name");
+    let v = r.refused(&["show", "@lib", "--at", "nope"], 2);
+    assert_eq!(v["error"]["code"], "unknown-revision");
+}

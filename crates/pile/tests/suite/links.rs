@@ -121,7 +121,23 @@ fn show_prints_each_link_both_ways_with_its_type_other_end_and_title() {
         .iter()
         .map(|n| n["command"].as_str().unwrap().to_string())
         .collect();
-    assert_eq!(next, ["pile show @storage", "pile show @journeys"]);
+    assert_eq!(
+        next,
+        [
+            "pile show @storage",
+            "pile show @journeys",
+            "pile show @words"
+        ]
+    );
+    // Then the aux pile that creates the links' types, once.
+    assert!(
+        a.json()["next"][2]["why"]
+            .as_str()
+            .unwrap()
+            .starts_with("the aux pile that creates uses, exercises:"),
+        "{}",
+        a.json()["next"]
+    );
 
     // At the other end, the same edge, the other way.
     contains!(
