@@ -246,8 +246,9 @@ fn dispatch(matches: &ArgMatches, out: &mut Out, mode: Mode) -> Result {
     }
 }
 
-/// A bare `pile` for an agent: which binary this is, every pile, and a line
-/// per pile of what changed, in one answer, so a session starts oriented.
+/// A bare `pile` for an agent: which binary this is, and every pile once,
+/// with its links and what changed in it, in one answer, so a session
+/// starts oriented.
 /// False where there is nothing to orient in: outside a repository, in one
 /// that declares no pile, or in one whose piles cannot be read. There the
 /// help is the answer.
@@ -295,12 +296,40 @@ fn orient(out: &mut Out, mode: Mode) -> Result<bool> {
         out.next(command, why);
     }
     let mut taken = parts.into_iter().map(|p| p.result.unwrap_or(Value::Null));
+    let version = taken.next().unwrap_or(Value::Null);
+    let listed = taken.next().unwrap_or(Value::Null);
+    let status = taken.next().unwrap_or(Value::Null);
     out.result(json!({
-        "version": taken.next(),
-        "piles": taken.next().and_then(|l| l.get("piles").cloned()),
-        "status": taken.next(),
+        "version": version,
+        "piles": oriented(&listed, &status),
+        "total": status.get("total"),
     }));
     Ok(true)
+}
+
+/// Each pile once, as `pile list` gives it, with the counts
+/// `pile status` gives it beside: `name`, `path`, `id`, `links`, `changed`,
+/// `untracked` and `crossed`. A pile is matched by its path, which no two
+/// piles share.
+fn oriented(listed: &Value, status: &Value) -> Vec<Value> {
+    let counted = status["piles"].as_array().map_or(&[][..], Vec::as_slice);
+    let listed = listed["piles"].as_array().map_or(&[][..], Vec::as_slice);
+    listed
+        .iter()
+        .map(|p| {
+            let mut p = p.clone();
+            if let Some(c) = counted.iter().find(|c| c["path"] == p["path"])
+                && let (Some(p), Some(c)) = (p.as_object_mut(), c.as_object())
+            {
+                for key in ["changed", "untracked", "crossed"] {
+                    if let Some(v) = c.get(key) {
+                        p.insert(key.into(), v.clone());
+                    }
+                }
+            }
+            p
+        })
+        .collect()
 }
 
 /// The repository `pile` was run in.

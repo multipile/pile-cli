@@ -29,8 +29,9 @@ AI_AGENT= AGENT= pile status
 - **A refusal goes to stdout, in text too.** It reads as it would on
   stderr, and the exit code is the same.
 - **A bare `pile` says where the agent is.** Inside a repository that
-  declares piles, it answers at once what `pile version`, `pile list` and
-  `pile status --all --brief` would, and its `next` starts with
+  declares piles, it answers at once with the version, and every pile
+  once: what `pile list` says of it, with the counts
+  `pile status --all --brief` gives it beside. Its `next` starts with
   `pile guide`. Anywhere else, there is nothing to say where it is in, so
   it prints the help.
 

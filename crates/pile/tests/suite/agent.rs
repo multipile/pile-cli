@@ -67,8 +67,23 @@ fn a_bare_pile_tells_an_agent_where_it_is_in_one_answer() {
     assert_eq!(a.code, 0, "{}", a.stderr);
     let v = a.json();
     assert_eq!(v["result"]["version"]["version"], "dev");
-    assert_eq!(v["result"]["piles"].as_array().unwrap().len(), 4);
-    assert_eq!(v["result"]["status"]["total"]["piles"], 4);
+    let piles = v["result"]["piles"].as_array().unwrap();
+    assert_eq!(piles.len(), 4);
+    for p in piles {
+        for key in [
+            "name",
+            "path",
+            "id",
+            "links",
+            "changed",
+            "untracked",
+            "crossed",
+        ] {
+            assert!(p.get(key).is_some(), "{key} missing from {p}");
+        }
+    }
+    assert_eq!(v["result"]["total"]["piles"], 4);
+    assert!(v["result"].get("status").is_none(), "{v}");
     assert_eq!(v["next"][0]["command"], "pile guide");
     assert_eq!(v["next"][1]["command"], "pile show <pile>");
     let text = r.answered(&[("AGENT", "1")], &["--format", "text"]);
