@@ -26,6 +26,10 @@ this pile… Change it when…", admits nothing.
 - **makes the intent untrue**: the change belongs, but a sentence is false
   after it, and the change did not rewrite that sentence.
 
+A change a sentence refuses is outside the intent, even where that
+sentence also says what the pile is: makes the intent untrue is only for
+a change that belongs. One change gets one finding.
+
 A rewritten intent is held to its base too. It is **worse** when it is:
 
 1. vaguer: the headline became a topic, a list, or says "and" twice;
