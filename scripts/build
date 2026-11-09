@@ -1,10 +1,10 @@
 #!/bin/sh
 # Build bin/pile from the working tree, stamped with the commit and the date.
-# Run it from the root, under mise. mise puts bin/ first on PATH.
+# Run it from the root, in the flake's shell. The shell puts bin/ first on PATH.
 #
 # On Linux the binary is linked statically against musl, so it links no libc
 # and runs the same outside the toolchain that built it. cargo-zigbuild links
-# it with the zig that mise pins. On macOS it is the host's own build.
+# it with the zig that flake.nix pins. On macOS it is the host's own build.
 set -eu
 PILE_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
 PILE_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)

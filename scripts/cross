@@ -1,6 +1,6 @@
 #!/bin/sh
 # Build bin/pile-<os>-<arch> for every platform in PLATFORMS, and print the
-# path of each. Run it from the root, under mise.
+# path of each. Run it from the root, in the flake's shell.
 #
 # Platforms are named os/arch the way Go names them, because a release's
 # files are called by those names, and mise's github backend matches on

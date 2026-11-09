@@ -31,11 +31,12 @@ Or download the archive for your platform from the [releases page](https://githu
 
 ## Build
 
-The toolchain is pinned in `mise.toml`.
+The toolchain is pinned in `flake.nix`, so building needs [Nix](https://nixos.org) with flakes.
 
 ```sh
-mise x -- scripts/build    # writes bin/pile
-mise x -- scripts/check    # formatting, clippy, tests, journeys and every release platform
+nix develop -c scripts/build    # writes bin/pile
+nix develop -c scripts/check    # formatting, clippy, tests, journeys and every release platform
+nix flake check                 # the tests, clippy and rustfmt, in the Nix sandbox
 ```
 
 `AGENTS.md` describes how work is done in this repository.

@@ -1,8 +1,8 @@
 #!/bin/sh
 # Cross-compile the commit that a v<version> tag points at, and publish it as
-# that release of this repository on GitHub. Run it from the root,
-# under mise, with a clean tree at the tagged commit, and with RELEASE_TOKEN
-# set to a token that can write releases. CI runs it after the check on every v* tag
+# that release of this repository on GitHub. Run it from the root, in the
+# flake's shell, with a clean tree at the tagged commit, and with
+# RELEASE_TOKEN set to a token that can write releases. CI runs it after the check on every v* tag
 # pushed. scripts/tag is what pushes them.
 #
 # The tag is the one named on the command line. Otherwise it is the tag CI
