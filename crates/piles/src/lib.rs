@@ -279,6 +279,30 @@ impl Structure {
             .find(|p| p.path != path && under(&p.path, path))
     }
 
+    /// Where a pile is mounted: the pile it is mounted in, which in a git
+    /// repository is its parent, and its path relative to that pile, with no
+    /// leading `/`: `/lib/sub` is mounted in `/lib` at `sub`. None for a top
+    /// of the mount tree, which is mounted in no pile.
+    pub fn mount(&self, path: &str) -> Option<(&Pile, String)> {
+        let parent = self.parent(path)?;
+        let rest = if parent.path == ROOT {
+            path
+        } else {
+            &path[parent.path.len()..]
+        };
+        Some((parent, rest.trim_start_matches('/').to_string()))
+    }
+
+    /// The tops of the mount tree, in path order: the piles mounted in no
+    /// pile. The root pile alone when there is one, and otherwise each pile
+    /// with no pile above it.
+    pub fn tops(&self) -> Vec<&Pile> {
+        self.ordered()
+            .into_iter()
+            .filter(|p| self.parent(&p.path).is_none())
+            .collect()
+    }
+
     /// The piles a pile holds directly, in path order. A pile inside one of
     /// them is that one's.
     pub fn children(&self, path: &str) -> Vec<&Pile> {

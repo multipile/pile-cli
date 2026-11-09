@@ -75,6 +75,27 @@ fn a_repository_whose_top_is_not_a_pile_has_paths_in_no_pile() {
 }
 
 #[test]
+fn a_pile_is_mounted_in_its_parent_at_its_path_relative_to_it() {
+    let s = discover(&repository(), &State::Working).unwrap();
+    let mount = |p: &str| s.mount(p).map(|(m, at)| (m.path.clone(), at));
+    assert_eq!(mount("/lib/sub"), Some(("/lib".into(), "sub".into())));
+    assert_eq!(mount("/lib-v2"), Some(("/".into(), "lib-v2".into())));
+    assert_eq!(mount("/"), None);
+    assert_eq!(paths(&s.tops()), ["/"]);
+
+    let mut m = Memory::new();
+    declare(&mut m, "/a", A, "");
+    declare(&mut m, "/b/c", B, "");
+    declare(&mut m, "/b/c/d/e", C, "");
+    let s = discover(&m, &State::Working).unwrap();
+    assert_eq!(paths(&s.tops()), ["/a", "/b/c"]);
+    assert_eq!(
+        s.mount("/b/c/d/e").map(|(m, at)| (m.path.clone(), at)),
+        Some(("/b/c".into(), "d/e".into()))
+    );
+}
+
+#[test]
 fn ids_and_names_two_piles_claim_are_named_with_every_claimant() {
     let mut m = Memory::new();
     declare(&mut m, "/", A, "one");

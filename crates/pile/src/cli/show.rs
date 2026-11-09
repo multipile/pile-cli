@@ -23,8 +23,12 @@ pub(super) fn command() -> Command {
              show refuses and names the pile the path is in, rather than show that\n\
              pile, so that show can say whether a subtree is declared.\n\n\
              Under the heading, show prints:\n  \
+             - mounted: its path relative to the pile it is mounted in, and that\n    \
+             pile, unless it is a top of the mount tree. A pile is mounted in its\n    \
+             parent: pile list --tree prints the whole tree\n  \
              - parent: the pile it sits in, unless it is at the top\n  \
-             - children: the piles it holds directly\n  \
+             - children: the piles it holds directly, each with its path relative\n    \
+             to this pile\n  \
              - written: the commit that last changed the intent, its date, and how\n    \
              many commits have changed the pile since. The count is not a verdict on\n    \
              the intent, but an intent many commits behind its pile is one to read\n    \
@@ -91,8 +95,11 @@ pub(super) fn command() -> Command {
 }
 
 /// The result is the pile, `name`, `path`, `id`, `kind` and `version`;
+/// `mount`, as `in` (the pile it is mounted in, as it is typed) and `path`
+/// (its path relative to that pile), or `null` at a top of the mount tree;
 /// `parent`, `name`, `path` and `id`, or `null` at the top; `children`, the
-/// same for each, in path order; `written`, as `commit` (the whole id, or
+/// same for each, with its `mount`, its path relative to this pile, in path
+/// order; `written`, as `commit` (the whole id, or
 /// `null` when no commit holds the intent), `date` and `since`, or `null`
 /// for a pile with no intent; `values`, each property the pile gives in
 /// `[pile]`, with a list of its values; `types`, each type the pile creates,
@@ -167,6 +174,17 @@ pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
         ),
     );
 
+    let mount = s.mount(&pile.path);
+    if let Some((within, at)) = &mount {
+        say(out, "mounted", &format!("{at} in {}", within.handle()));
+    }
+    result.insert(
+        "mount".into(),
+        mount.as_ref().map_or(
+            Value::Null,
+            |(within, at)| json!({"in": within.handle(), "path": at}),
+        ),
+    );
     let parent = s.parent(&pile.path);
     if let Some(p) = parent {
         say(out, "parent", &heading(p));
@@ -176,12 +194,43 @@ pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
     if children.is_empty() {
         say(out, "children", "none");
     } else {
-        let lines: Vec<String> = children.iter().map(|c| heading(c)).collect();
+        // Each child by its name, its path relative to this pile, and its
+        // id, in columns.
+        let at = |c: &Pile| s.mount(&c.path).map(|(_, at)| at).unwrap_or_default();
+        let names = children
+            .iter()
+            .filter(|c| !c.name.is_empty())
+            .map(|c| c.name.len() + 1)
+            .max()
+            .unwrap_or(0);
+        let paths = children.iter().map(|c| at(c).len()).max().unwrap_or(0);
+        let lines: Vec<String> = children
+            .iter()
+            .map(|c| {
+                let name = if c.name.is_empty() {
+                    String::new()
+                } else {
+                    piles::typed(&c.name)
+                };
+                if names == 0 {
+                    format!("{:<paths$}  {}", at(c), id(c))
+                } else {
+                    format!("{name:<names$}  {:<paths$}  {}", at(c), id(c))
+                }
+            })
+            .collect();
         say_all(out, "children", &lines);
     }
     result.insert(
         "children".into(),
-        children.iter().map(|c| pile_value(c)).collect(),
+        children
+            .iter()
+            .map(|c| {
+                let mut v = pile_value(c);
+                v["mount"] = json!(s.mount(&c.path).map(|(_, at)| at));
+                v
+            })
+            .collect(),
     );
 
     let mut written = Value::Null;

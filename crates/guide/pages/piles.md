@@ -69,6 +69,13 @@ A path with no pile at or above it is in no pile.
 - Declaring a pile inside another moves no file. The paths under the new
   pile are in it from then on, and no longer in its parent.
 
+A pile is mounted in its parent, at its path relative to the parent:
+`:/services/billing/invoices` is mounted in the pile at `:/services/billing`
+at `invoices`. So the piles form a mount tree, whose top is the root pile.
+A pile with no pile above it is a top of its own. Nothing declares a
+mount: the tree is what the directories already say. `pile list --tree`
+prints it, and `pile show` names the pile one is mounted in.
+
 ## Git keeps everything else
 
 `pile` makes no commit. Git keeps the versions, the content and the

@@ -11,12 +11,13 @@ fn show_prints_the_pile_where_it_sits_when_its_intent_was_written_and_the_intent
     r.write("lib/parse.rs", "edited\n");
     r.commit("edit");
     let out = r.stdout(&["show", "@lib"]);
-    let head: Vec<&str> = out.lines().take(4).collect();
+    let head: Vec<&str> = out.lines().take(5).collect();
     assert_eq!(head[0], "@lib  :/lib  bbbbbbbb  gitpile/1");
-    assert_eq!(head[1], "   parent    @top  :/  aaaaaaaa");
-    assert_eq!(head[2], "   children  :/lib/sub  cccccccc");
+    assert_eq!(head[1], "   mounted   lib in @top");
+    assert_eq!(head[2], "   parent    @top  :/  aaaaaaaa");
+    assert_eq!(head[3], "   children  sub  cccccccc");
     assert!(
-        head[3].starts_with("   written   ") && head[3].ends_with(", 1 commit to this pile since"),
+        head[4].starts_with("   written   ") && head[4].ends_with(", 1 commit to this pile since"),
         "{out}"
     );
     contains!(
@@ -28,7 +29,9 @@ fn show_prints_the_pile_where_it_sits_when_its_intent_was_written_and_the_intent
         v["parent"],
         json!({"name": "top", "path": ":/", "id": id_of("a")})
     );
+    assert_eq!(v["mount"], json!({"in": "@top", "path": "lib"}));
     assert_eq!(v["children"][0]["path"], ":/lib/sub");
+    assert_eq!(v["children"][0]["mount"], "sub");
     assert_eq!(v["written"]["since"], 1);
     assert_eq!(v["written"]["commit"].as_str().unwrap().len(), 40);
     assert_eq!(v["files"][0]["name"], ":/lib/.pile/intent.md");
@@ -212,4 +215,25 @@ fn at_a_revision_a_pile_it_does_not_declare_is_refused() {
     assert_eq!(v["error"]["code"], "unknown-name");
     let v = r.refused(&["show", "@lib", "--at", "nope"], 2);
     assert_eq!(v["error"]["code"], "unknown-revision");
+}
+
+#[test]
+fn the_top_is_mounted_in_no_pile_and_its_children_are_named_at_their_paths_in_it() {
+    let r = nested();
+    r.declare("lib-v2/deep/er", "e", "");
+    let out = r.stdout(&["show", "@top"]);
+    assert!(!out.contains("mounted"), "{out}");
+    contains!(
+        out,
+        "   children  @lib  lib     bbbbbbbb\n             @v2   lib-v2  dddddddd\n"
+    );
+    assert_eq!(r.result(&["show", "@top"])["mount"], json!(null));
+    contains!(
+        r.stdout(&["show", "@v2"]),
+        "   children  deep/er  eeeeeeee\n"
+    );
+    contains!(
+        r.stdout(&["show", ":/lib-v2/deep/er"]),
+        "   mounted   deep/er in @v2\n"
+    );
 }
