@@ -18,8 +18,17 @@ fn list_prints_every_pile_in_path_order_with_its_name_path_and_id() {
     let v = r.result(&["list"]);
     assert_eq!(
         v["piles"][3],
-        json!({"name": null, "path": ":/lib/sub", "id": id_of("c"), "links": []})
+        json!({
+            "name": null,
+            "path": ":/lib/sub",
+            "id": id_of("c"),
+            "mount": "sub",
+            "mounted_in": "@lib",
+            "links": []
+        })
     );
+    assert_eq!(v["piles"][0]["mount"], json!(null));
+    assert_eq!(v["piles"][0]["mounted_in"], json!(null));
     assert_eq!(v["duplicate_ids"], json!([]));
     contains!(r.stdout(&["list", "--full"]), id_of("a"));
 }
@@ -107,4 +116,74 @@ fn outside_a_repository_it_is_refused_saying_how_to_make_one() {
     let a = answered(dir.path(), &[], &["list", "--format", "json"]);
     assert_eq!(a.code, 1);
     assert_eq!(a.json()["error"]["code"], "not-a-repository");
+}
+
+#[test]
+fn tree_prints_each_pile_under_the_pile_it_is_mounted_in_at_its_path_relative_to_it() {
+    let r = nested();
+    assert_eq!(
+        r.stdout(&["list", "--tree"]),
+        "@top      :/      aaaaaaaa\n\
+         ├── @lib  lib     bbbbbbbb\n\
+         │   └──   sub     cccccccc\n\
+         └── @v2   lib-v2  dddddddd\n\n4 piles\n"
+    );
+    let v = r.result(&["list", "--tree"]);
+    let tops = v["piles"].as_array().unwrap();
+    assert_eq!(tops.len(), 1, "{v}");
+    assert_eq!(tops[0]["path"], ":/");
+    assert_eq!(tops[0]["mount"], json!(null));
+    let lib = &tops[0]["piles"][0];
+    assert_eq!(
+        (&lib["mount"], &lib["mounted_in"]),
+        (&json!("lib"), &json!("@top"))
+    );
+    assert_eq!(lib["piles"][0]["path"], ":/lib/sub");
+    assert_eq!(lib["piles"][0]["mount"], "sub");
+    assert_eq!(lib["piles"][0]["piles"], json!([]));
+    assert_eq!(tops[0]["piles"][1]["name"], "v2");
+}
+
+#[test]
+fn tree_lines_up_every_column_when_a_deep_name_is_the_widest() {
+    let r = nested();
+    r.declare("lib/sub/inner", "e", "a-rather-long-pile-name");
+    let out = r.stdout(&["list", "--tree"]);
+    let lines: Vec<&str> = out.lines().take(5).collect();
+    assert_eq!(
+        lines[3], "│       └── @a-rather-long-pile-name  inner   eeeeeeee",
+        "{out}"
+    );
+    // Each path, and each id, starts at the same column on every line.
+    let column = |l: &str, of: &str| l.chars().count() - l[l.find(of).unwrap()..].chars().count();
+    let paths: Vec<usize> = [":/", "lib", "sub", "inner", "lib-v2"]
+        .iter()
+        .zip(&lines)
+        .map(|(p, l)| column(l, &format!("  {p}")))
+        .collect();
+    assert!(paths.iter().all(|c| *c == paths[0]), "{out}");
+    let ids: Vec<usize> = ["aaaaaaaa", "bbbbbbbb", "cccccccc", "eeeeeeee", "dddddddd"]
+        .iter()
+        .zip(&lines)
+        .map(|(id, l)| column(l, id))
+        .collect();
+    assert!(ids.iter().all(|c| *c == ids[0]), "{out}");
+}
+
+#[test]
+fn tree_with_no_pile_at_the_top_has_a_top_for_each_pile_with_none_above_it() {
+    let r = Repo::empty();
+    r.declare("a", "a", "a");
+    r.declare("b/c", "b", "c");
+    r.declare("b/c/d/e", "c", "e");
+    assert_eq!(
+        r.stdout(&["list", "--tree"]),
+        "@a      :/a    aaaaaaaa\n\
+         @c      :/b/c  bbbbbbbb\n\
+         └── @e  d/e    cccccccc\n\n3 piles\n"
+    );
+    let v = r.result(&["list", "--tree"]);
+    assert_eq!(v["piles"].as_array().unwrap().len(), 2, "{v}");
+    assert_eq!(v["piles"][1]["piles"][0]["mount"], "d/e");
+    assert_eq!(v["piles"][1]["piles"][0]["mounted_in"], "@c");
 }

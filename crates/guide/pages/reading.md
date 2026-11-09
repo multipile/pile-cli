@@ -9,6 +9,7 @@ what it prints. This page says when to reach for which.
 
 ```sh
 pile list                   # every pile: its name, its path, its id, its links
+pile list --tree            # each pile under the pile it is mounted in
 pile show <pile>            # one pile whole: config, children, links, intent
 pile which <path>           # the pile a path is in, its headline and links
 pile files <pile>           # one pile's own files, and how long each is
@@ -21,11 +22,12 @@ pile doctor                 # what is wrong with any pile
 
 ## Start wide, then narrow
 
-`pile list` is the cheapest way to see what the repository declares. Then
-`pile which` finds the pile a file is in. Piles nest, so the path alone
-does not show which pile that is, and `which` answers for a file that does
-not exist yet as readily as for one that does. Then `pile show` prints
-that pile whole, its intent with it. Read it before you change the pile.
+`pile list` is the cheapest way to see what the repository declares, and
+`pile list --tree` shows how the piles nest. Then `pile which` finds the
+pile a file is in. Piles nest, so the path alone does not show which pile
+that is, and `which` answers for a file that does not exist yet as readily
+as for one that does. Then `pile show` prints that pile whole, its intent
+with it. Read it before you change the pile.
 
 ## Follow a pile's links
 

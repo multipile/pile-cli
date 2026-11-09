@@ -78,7 +78,7 @@ says ", nothing to this pile since" "and that nothing changed the pile since its
 says "The grammar and the parser built from it." "and prints the intent whole"
 
 pp show
-says "   children  @parser  :/parser  " "the top holds the parser"
+says "   children  @parser  parser  " "the top holds the parser, mounted at parser"
 
 pp doctor
 says "2 piles, nothing wrong" "doctor finds nothing wrong with the piles just declared"

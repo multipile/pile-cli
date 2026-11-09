@@ -28,25 +28,42 @@ pub(super) fn command() -> Command {
              nothing, so it exits 0 whatever it finds, and in a repository that\n\
              declares no pile it says so and exits 0 too.\n\n\
              The piles are what the working copy declares now: a pile declared a\n\
-             minute ago is listed, and nothing is read from a stored list.",
+             minute ago is listed, and nothing is read from a stored list.\n\n\
+             --tree prints the mount tree instead of the list. Each pile is mounted\n\
+             in its parent, the nearest pile above it, so the root pile is the top\n\
+             of the tree, and each other pile sits under the pile it is mounted in.\n\
+             A pile's path is then printed relative to that pile, not from the top\n\
+             of the repository: @model at :/design/model, mounted in @design at\n\
+             :/design, is printed as model. A pile mounted in no pile is a top of\n\
+             the tree, printed with its :/ path. The names, ids, link counts and\n\
+             what two piles claim are as in the list.",
         )
-        .override_usage("pile list [--full]")
+        .override_usage("pile list [--full] [--tree]")
         .arg(no_positional())
         .arg(switch(
             "full",
             "print whole ids rather than the first eight",
         ))
+        .arg(switch(
+            "tree",
+            "print the mount tree, each path relative to the pile it is mounted in",
+        ))
 }
 
 /// The result is `piles`, each as `name` (without its @, `null` for none),
-/// `path` and `id`, whole, and `links`, each edge with the pile at one end,
+/// `path` and `id`, whole, `mount`, its path relative to the pile it is
+/// mounted in, and `mounted_in`, that pile as it is typed (both `null` for a
+/// top of the mount tree), and `links`, each edge with the pile at one end,
 /// as `direction` (`to` or `from`), `type` and `other`, the other end as it
 /// is typed, in path order; `duplicate_ids`, each as `id` and
 /// `claimants`, the paths of the piles claiming it; and `duplicate_names`,
-/// each as `name` and `claimants`.
+/// each as `name` and `claimants`. With --tree, `piles` holds only the tops
+/// of the mount tree, and each pile holds the piles mounted in it, as
+/// `piles`, in path order.
 pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
     no_args("list", m)?;
     let full = m.get_flag("full");
+    let tree = m.get_flag("tree");
     let r = open()?;
     let s = r.piles()?;
     let piles = s.ordered();
@@ -54,17 +71,31 @@ pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
     let names = s.duplicate_names();
     let rows = graph::read(r.storage(), &State::Working)?;
     let linked: Vec<Vec<links::Link>> = piles.iter().map(|p| links::of(&rows, &s, p)).collect();
-    out.result(json!({
-        "piles": piles
+    let value = |p: &Pile| {
+        let i = piles
             .iter()
-            .zip(&linked)
-            .map(|(p, l)| json!({
-                "name": name_of(&p.name),
-                "path": shown(&p.path),
-                "id": p.id,
-                "links": l.iter().map(|l| l.brief()).collect::<Vec<_>>(),
-            }))
-            .collect::<Vec<_>>(),
+            .position(|q| q.path == p.path)
+            .expect("a pile of the tree is listed");
+        let mount = s.mount(&p.path);
+        json!({
+            "name": name_of(&p.name),
+            "path": shown(&p.path),
+            "id": p.id,
+            "mount": mount.as_ref().map(|(_, at)| at.clone()),
+            "mounted_in": mount.as_ref().map(|(m, _)| m.handle()),
+            "links": linked[i].iter().map(|l| l.brief()).collect::<Vec<_>>(),
+        })
+    };
+    let listed: Vec<Value> = if tree {
+        s.tops()
+            .into_iter()
+            .map(|p| nested(&s, p, &value))
+            .collect()
+    } else {
+        piles.iter().map(|p| value(p)).collect()
+    };
+    out.result(json!({
+        "piles": listed,
         "duplicate_ids": claimed(&ids, "id"),
         "duplicate_names": claimed(&names, "name"),
     }));
@@ -76,17 +107,6 @@ pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
         return Ok(());
     }
 
-    let width = piles
-        .iter()
-        .map(|p| shown(&p.path).len())
-        .max()
-        .unwrap_or(0);
-    let name_width = piles
-        .iter()
-        .filter(|p| !p.name.is_empty())
-        .map(|p| p.name.len() + 1)
-        .max()
-        .unwrap_or(0);
     // The counts, `-> 2  <- 1`, only where some pile has a link. A link
     // with the pile at neither end is counted by neither.
     let count = |l: &[links::Link], d| l.iter().filter(|l| l.direction == d).count();
@@ -105,20 +125,61 @@ pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
         .map(|(l, to)| format!("-> {to:<wide$}  <- {}", count(l, links::Direction::From)))
         .collect();
     let any = !rows.edge.is_empty();
-    for (p, count) in piles.iter().zip(&counts) {
-        let id = if full { p.id.as_str() } else { p.short_id() };
-        let name = if p.name.is_empty() {
+    let name = |p: &Pile| {
+        if p.name.is_empty() {
             String::new()
         } else {
             piles::typed(&p.name)
-        };
-        let mut line = if name_width > 0 {
-            format!("{name:<name_width$}  {:<width$}  {id}", shown(&p.path))
+        }
+    };
+    // Each line as its columns: the name (in a tree, after the branches that
+    // lead to it), the path, and the pile's place in piles, for its id and
+    // counts.
+    let lines: Vec<(String, String, usize)> = if tree {
+        let mut lines = Vec::new();
+        for top in s.tops() {
+            branches(&s, top, "", "", &mut |p, lead| {
+                let path = match s.mount(&p.path) {
+                    Some((_, at)) => at,
+                    None => shown(&p.path),
+                };
+                let i = piles
+                    .iter()
+                    .position(|q| q.path == p.path)
+                    .expect("a pile of the tree is listed");
+                lines.push((format!("{lead}{}", name(p)), path, i));
+            });
+        }
+        lines
+    } else {
+        piles
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (name(p), shown(&p.path), i))
+            .collect()
+    };
+    // Each column is as wide as its widest entry, a tree's branches
+    // included, so every column after it starts at the same place.
+    let first = lines
+        .iter()
+        .map(|(n, _, _)| n.chars().count())
+        .max()
+        .unwrap_or(0);
+    let width = lines
+        .iter()
+        .map(|(_, p, _)| p.chars().count())
+        .max()
+        .unwrap_or(0);
+    for (lead, path, i) in &lines {
+        let p = piles[*i];
+        let id = if full { p.id.as_str() } else { p.short_id() };
+        let mut line = if first > 0 {
+            format!("{lead:<first$}  {path:<width$}  {id}")
         } else {
-            format!("{:<width$}  {id}", shown(&p.path))
+            format!("{path:<width$}  {id}")
         };
         if any {
-            line.push_str(&format!("  {count}"));
+            line.push_str(&format!("  {}", counts[*i]));
         }
         putln!(out, "{line}");
     }
@@ -178,4 +239,46 @@ fn claimed(dupes: &BTreeMap<String, Vec<&Pile>>, key: &str) -> Value {
             })
             .collect(),
     )
+}
+
+/// A pile as the tree's result holds it: as the list holds it, with the
+/// piles mounted in it under `piles`.
+fn nested(s: &piles::Structure, p: &Pile, value: &dyn Fn(&Pile) -> Value) -> Value {
+    let mut one = value(p);
+    let under: Vec<Value> = s
+        .children(&p.path)
+        .into_iter()
+        .map(|c| nested(s, c, value))
+        .collect();
+    one["piles"] = json!(under);
+    one
+}
+
+/// Visits a pile and every pile mounted under it, depth first, in path
+/// order, each with the branches that lead to it: `├── ` or `└── ` after
+/// the `│   ` or blank columns of the piles above it. A top has none.
+fn branches(
+    s: &piles::Structure,
+    p: &Pile,
+    lead: &str,
+    above: &str,
+    visit: &mut dyn FnMut(&Pile, &str),
+) {
+    visit(p, lead);
+    let children = s.children(&p.path);
+    for (n, c) in children.iter().enumerate() {
+        let last = n + 1 == children.len();
+        let (here, next) = if last {
+            ("└── ", "    ")
+        } else {
+            ("├── ", "│   ")
+        };
+        branches(
+            s,
+            c,
+            &format!("{above}{here}"),
+            &format!("{above}{next}"),
+            visit,
+        );
+    }
 }
