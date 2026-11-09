@@ -15,7 +15,7 @@ This repository builds `pile`, the binary of multipile.
 
 `pile guide commit-a-change` says what holds before any commit. Here, also:
 
-- Run the whole check: `mise x -- scripts/check`. It must pass. It builds
+- Run the whole check: `nix develop -c scripts/check`. It must pass. It builds
   `bin/pile`, checks the formatting, runs clippy, every test and every
   journey, builds every platform a release is built for, and runs
   `pile doctor` on this repository's piles.
@@ -26,10 +26,15 @@ This repository builds `pile`, the binary of multipile.
 
 ### The toolchain
 
-Every script here runs with the tools `mise.toml` pins. Either activate
-mise in the shell, or put `mise x --` in front. mise puts `bin/` first on
-PATH, and `bin/pile` is what `scripts/build` last wrote. Git does not track
-it, so it can be stale.
+Every script here runs with the tools `flake.nix` pins, in its shell:
+enter it with `nix develop`, or put `nix develop -c` in front. The shell
+puts `bin/` first on PATH, and `bin/pile` is what `scripts/build` last
+wrote. Git does not track it, so it can be stale.
+
+A dependency the code needs is a Cargo dependency. One that is not on
+crates.io is a `git` dependency pinned to a commit with `rev`. A tool a
+script needs is added to the shell's `packages` in `flake.nix`, and
+`nix flake lock --update-input <input>` moves what an input pins.
 
 ### The piles
 
@@ -66,8 +71,8 @@ the same commit as the command.
 A change to what a user of `pile` sees also comes with a new or changed
 journey in `journeys/stories/`, in the same commit. A journey is a whole
 session told as a bash script, and the check runs every one. Run them with
-`mise x -- journeys/run`, watch one with `SHOW=1`, and record one with
-`mise x -- journeys/record <journey>`. `journeys/README.md` says how to
+`nix develop -c journeys/run`, watch one with `SHOW=1`, and record one with
+`nix develop -c journeys/record <journey>`. `journeys/README.md` says how to
 write one.
 
 The guide's pages describe the commands. A change to a command is done

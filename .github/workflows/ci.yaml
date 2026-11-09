@@ -20,14 +20,9 @@ on:
     tags: ['v*']
   pull_request:
 
-# mise.toml sets env, and mise asks for a checkout to be trusted first.
-#
-# Every job with mise in it installs the mise that mise.toml names in
-# min_version. It is read off that line, so it is written in one place, and
-# left to itself mise-action would take the newest release. mise.lock makes
-# the install --locked.
-env:
-  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+# Every job that builds runs its script in the flake's shell, so it builds
+# with the toolchain flake.nix pins and flake.lock locks, the same one as on
+# a developer's machine.
 
 jobs:
   check:
@@ -36,15 +31,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # scripts/build stamps the commit
-      - id: mise
-        run: |
-          version=$(sed -n 's/^min_version = "\(.*\)"$/\1/p' mise.toml)
-          test -n "$version" || { echo "mise.toml names no min_version" >&2; exit 1; }
-          echo "version=$version" >>"$GITHUB_OUTPUT"
-      - uses: jdx/mise-action@v5
-        with:
-          version: ${{ steps.mise.outputs.version }}
-      - run: scripts/check
+      - uses: cachix/install-nix-action@v31
+      - run: nix develop -c scripts/check
 
   tag:
     needs: check
@@ -70,15 +58,8 @@ jobs:
         with:
           ref: ${{ needs.tag.outputs.tag }}
           fetch-depth: 0
-      - id: mise
-        run: |
-          version=$(sed -n 's/^min_version = "\(.*\)"$/\1/p' mise.toml)
-          test -n "$version" || { echo "mise.toml names no min_version" >&2; exit 1; }
-          echo "version=$version" >>"$GITHUB_OUTPUT"
-      - uses: jdx/mise-action@v5
-        with:
-          version: ${{ steps.mise.outputs.version }}
-      - run: scripts/release "${{ needs.tag.outputs.tag }}"
+      - uses: cachix/install-nix-action@v31
+      - run: nix develop -c scripts/release "${{ needs.tag.outputs.tag }}"
         env:
           RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -93,15 +74,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - id: mise
-        run: |
-          version=$(sed -n 's/^min_version = "\(.*\)"$/\1/p' mise.toml)
-          test -n "$version" || { echo "mise.toml names no min_version" >&2; exit 1; }
-          echo "version=$version" >>"$GITHUB_OUTPUT"
-      - uses: jdx/mise-action@v5
-        with:
-          version: ${{ steps.mise.outputs.version }}
-      - run: scripts/release
+      - uses: cachix/install-nix-action@v31
+      - run: nix develop -c scripts/release
         env:
           RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

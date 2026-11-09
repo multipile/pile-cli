@@ -2,7 +2,7 @@
 # The whole check: build bin/pile, check the formatting, run clippy and every
 # crate's tests, run every journey against bin/pile, build for every platform
 # a release is built for, then ask bin/pile doctor about this repository's
-# own piles. Run it from the root, under mise. CI runs it on every push and
+# own piles. Run it from the root, in the flake's shell. CI runs it on every push and
 # pull request.
 #
 # cross is here so that a commit that no longer compiles or links for one of

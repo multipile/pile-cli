@@ -6,6 +6,6 @@
 #   journeys/record                       every journey
 #   journeys/record a-mistyped-command    one
 #
-# Run it under mise, which brings asciinema: `mise x -- journeys/record`.
+# Run it in the flake's shell, which brings asciinema: `nix develop -c journeys/record`.
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 CAST=${CAST:-$here/casts} exec "$here/run" "$@"

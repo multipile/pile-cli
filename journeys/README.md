@@ -15,7 +15,8 @@ QUIET=1 journeys/run                   # print a journey only when it fails
 journeys/record [<journey>...]         # record into journeys/casts/
 ```
 
-Run them under mise, which brings jq and asciinema: `mise x -- journeys/run`.
+Run them in the flake's shell, which brings jq and asciinema:
+`nix develop -c journeys/run`.
 `run` builds `pile` from this checkout, unless `PILE_BIN` names a binary. It
 gives each journey a fresh repository in a temporary directory, and deletes
 it afterwards unless `KEEP` is set. It exits non-zero when any journey failed.
