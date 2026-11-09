@@ -6,7 +6,9 @@
 # A config holds kind, version, id and name, and no other key. Any other
 # line is refused, and the refusal names its line. Anything else a pile says
 # about itself is given in [pile], in a .toml file in its .pile/, which
-# opens with version = "gitpile/1". show prints each value a pile gives.
+# opens with version = "gitpile/1". show prints each value a pile gives,
+# its key in a column, and a key too long for the column still apart from
+# its value.
 # (pile guide piles, pile guide declarations, pile show --help,
 # pile doctor --help)
 . "$JOURNEY_LIB"
@@ -37,12 +39,14 @@ write src/.pile/pile.toml 'version = "gitpile/1"
 
 [pile]
 labels = ["core", "docs"]
+visibility = "public"
 '
 pp doctor
 exits 0 "with the labels in [pile], doctor exits 0"
 says "1 pile, nothing wrong" "and nothing is wrong"
 pp show @app
 says "labels    core, docs" "show prints the labels the pile gives"
+says "visibility public" "a key wider than the column still has a space before its value"
 ask show @app --format json
 field '.result.values.labels | join(",")' "core,docs" "in json, the labels are a list under values"
 

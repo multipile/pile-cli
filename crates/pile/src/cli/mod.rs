@@ -367,9 +367,9 @@ fn plural(n: usize, noun: &str) -> String {
 }
 
 /// A labelled line under a heading: three spaces in, the label in a column
-/// ten wide.
+/// ten wide. A label too long for the column still has a space after it.
 fn say(out: &mut Out, label: &str, text: &str) {
-    putln!(out, "   {label:<10}{text}");
+    putln!(out, "   {label:<9} {text}");
 }
 
 /// A label with a line for each item, the first beside it and the rest

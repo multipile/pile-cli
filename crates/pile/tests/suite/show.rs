@@ -79,6 +79,21 @@ fn the_files_in_its_pile_directory_this_binary_does_not_read_are_named() {
 }
 
 #[test]
+fn a_value_whose_key_is_wider_than_the_column_is_still_set_apart_from_it() {
+    let r = nested();
+    r.write(
+        "lib/.pile/pile.toml",
+        "version = \"gitpile/1\"\n[pile]\nvisibility = \"public\"\nmaintainers = [\"a\", \"b\"]\nurl = \"u\"\n",
+    );
+    contains!(
+        r.stdout(&["show", "@lib"]),
+        "   visibility public\n",
+        "   maintainers a, b\n",
+        "   url       u\n"
+    );
+}
+
+#[test]
 fn with_no_pile_named_show_prints_the_pile_it_runs_in() {
     let r = nested();
     std::fs::create_dir_all(r.path().join("lib/src/deep")).unwrap();
