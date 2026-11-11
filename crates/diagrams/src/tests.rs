@@ -101,6 +101,19 @@ fn a_pile_no_pile_answers_to_is_a_problem() {
 }
 
 #[test]
+fn a_pile_misspelt_is_answered_with_the_pile_it_is_near() {
+    let first = &piles()[0].handle();
+    let misspelt = format!("{}x", first);
+    let source = dependency(&format!("  box near pile=\"{misspelt}\""));
+    let found = findings(&diagram(&source), &piles());
+    assert_eq!(codes(&found), vec!["diagram-no-such-pile"]);
+    assert_eq!(
+        found[0].fix,
+        format!("did you mean {first}? Write pile=\"{first}\"")
+    );
+}
+
+#[test]
 fn a_renamed_pile_found_by_its_id_is_named_in_the_fix() {
     let source = dependency(&format!("  box cli pile=\"@command-line\" id=\"{CLI}\""));
     let found = findings(&diagram(&source), &piles());

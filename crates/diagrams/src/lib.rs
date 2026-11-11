@@ -170,13 +170,22 @@ pub fn findings(diagram: &Diagram, piles: &[Named]) -> Vec<Finding> {
                 ),
                 format!("write pile=\"{}\"", with_id.handle()),
             )),
-            (None, None, _) => out.push(problem(
-                "diagram-no-such-pile",
-                &diagram.path,
-                at,
-                format!("no pile answers to {}", pile.reference),
-                "name a pile pile list prints, by @name or by its :/ path, or leave pile= out".to_string(),
-            )),
+            (None, None, _) => {
+                let handles: Vec<String> = piles.iter().map(Named::handle).collect();
+                let near = diagram_format::finding::nearest(&pile.reference, handles.iter().map(String::as_str));
+                let fix = match near {
+                    Some(near) => format!("did you mean {near}? Write pile=\"{near}\""),
+                    None => "name one of the piles pile list prints, as @name or as its :/ path, or leave pile= out"
+                        .to_string(),
+                };
+                out.push(problem(
+                    "diagram-no-such-pile",
+                    &diagram.path,
+                    at,
+                    format!("no pile answers to {}", pile.reference),
+                    fix,
+                ))
+            }
         }
     }
     out
