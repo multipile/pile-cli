@@ -38,6 +38,7 @@ macro_rules! putln {
 }
 
 mod complete;
+mod diagram;
 mod doctor;
 mod files;
 mod gitdiff;
@@ -104,6 +105,7 @@ pub fn command() -> Command {
         .subcommand(one_help(with_help(gitdiff::command())))
         .subcommand(one_help(with_help(log::command())))
         .subcommand(one_help(with_help(doctor::command())))
+        .subcommand(one_help(with_help(diagram::command())))
         .subcommand(one_help(with_help(guide::command())))
         .subcommand(one_help(with_help(version::command())))
         .subcommand(one_help(with_help(complete::command())))
@@ -229,6 +231,7 @@ fn dispatch(matches: &ArgMatches, out: &mut Out, mode: Mode) -> Result {
         Some(("gitdiff", m)) => gitdiff::run(m, out),
         Some(("log", m)) => log::run(m, out),
         Some(("doctor", m)) => doctor::run(m, out),
+        Some(("diagram", m)) => diagram::run(m, out),
         Some(("guide", m)) => guide::run(m, out),
         Some(("version", m)) => version::run(m, out, mode),
         Some(("completion", m)) => complete::run(m, out),

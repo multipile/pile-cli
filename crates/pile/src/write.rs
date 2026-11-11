@@ -1,6 +1,6 @@
 //! The only writes `pile` makes: the `.pile/` files `init` and `set` write,
-//! on disk, in the working copy. Nothing here goes through the storage
-//! interface, which only reads.
+//! and the drawing `diagram render` writes where it is told, on disk.
+//! Nothing here goes through the storage interface, which only reads.
 //!
 //! A new file is created only where there is none, so a config that is
 //! already there is never overwritten. A file that is rewritten goes to a
@@ -42,7 +42,7 @@ pub fn create(path: &Path, content: &str) -> Result<Created, Refusal> {
 
 /// Replaces a file's content, through a temporary file beside it and a
 /// rename.
-pub fn replace(path: &Path, content: &str) -> Result<(), Refusal> {
+pub fn replace(path: &Path, content: impl AsRef<[u8]>) -> Result<(), Refusal> {
     let dir = path.parent().unwrap_or(Path::new("."));
     let name = path
         .file_name()
@@ -54,7 +54,7 @@ pub fn replace(path: &Path, content: &str) -> Result<(), Refusal> {
         .create_new(true)
         .open(&temp)
         .and_then(|mut f| {
-            f.write_all(content.as_bytes())?;
+            f.write_all(content.as_ref())?;
             f.sync_all()
         })
         .and_then(|()| std::fs::rename(&temp, path));

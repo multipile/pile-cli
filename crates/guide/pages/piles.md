@@ -1,7 +1,7 @@
 +++
 role = reference
 summary = what a pile is: its .pile directory, config, id and name, and nesting
-see = paths intent boundaries declarations links aux
+see = paths intent boundaries declarations links aux diagrams
 +++
 A pile is a subtree of a git repository that has a `.pile/` directory, and
 says why it is one thing. Piles are the parts a repository is talked about
@@ -19,7 +19,8 @@ A pile's `.pile/` directory holds two files:
 
 `pile init` writes both, in the directory you are in. A pile may add
 `.toml` files, which declare nodes, types, links and the pile's own values,
-such as its labels (`pile guide declarations`). Any other file in a `.pile/` is
+such as its labels (`pile guide declarations`), and diagrams, in its
+`.pile/diagrams/` (`pile guide diagrams`). Any other file in a `.pile/` is
 an unread file, such as `notes.md`. `pile` does not read it, and refuses
 nothing for it, because another program may keep a file there.
 

@@ -28,6 +28,9 @@ piles = { path = "../piles" }
 graph = { path = "../graph" }
 # The pages pile guide prints, compiled in.
 guide = { path = "../guide" }
+# The diagrams a repository keeps, what doctor finds wrong with them, and
+# how one is drawn.
+diagrams = { path = "../diagrams" }
 
 # Arguments, help and completion. clap_complete's dynamic engine asks this
 # binary what to offer at each keystroke, so later commands can complete

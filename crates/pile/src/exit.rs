@@ -116,9 +116,21 @@ codes! {
     NoSharedHistory = "no-shared-history", FAILURE;
     /// `doctor` found a problem. The report is the result, whole.
     ProblemsFound = "problems-found", FAILURE;
-    /// A `.pile/` file could not be written. The message says which, and
-    /// what the operating system said.
+    /// A file could not be written: a `.pile/` file, or a drawing. The
+    /// message says which, and what the operating system said.
     WriteFailed = "write-failed", FAILURE;
+    /// `diagram render` was given a name no pile keeps a diagram by.
+    NoSuchDiagram = "no-such-diagram", FAILURE;
+    /// Two piles keep a diagram of the name given, so it names neither.
+    DiagramNameAmbiguous = "diagram-name-ambiguous", FAILURE;
+    /// The diagram breaks a rule of its format, or names a pile the
+    /// repository does not have, so it is not drawn.
+    DiagramInvalid = "diagram-invalid", FAILURE;
+    /// `diagram render` was asked to draw as something other than html,
+    /// png or gif.
+    UnknownOutput = "unknown-output", USAGE;
+    /// A diagram that reads could not be drawn. The message says why.
+    DrawFailed = "draw-failed", FAILURE;
     /// A refusal that has no code of its own yet. Every refusal `pile` means
     /// to give has one, so this one is worth reporting.
     Failed = "failed", FAILURE;

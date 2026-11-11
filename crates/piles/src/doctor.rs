@@ -28,8 +28,8 @@ use storage::{Content, FileKind, State, Storage, Subtree};
 
 use crate::config::{self, Config};
 use crate::{
-    CONFIG_FILE, INTENT_FILE, PILE_DIR, Position, ROOT, declared_by, intent, is_toml, join, shown,
-    typed, under,
+    CONFIG_FILE, INTENT_FILE, PILE_DIR, Position, ROOT, declared_by, diagram_of, intent, is_toml,
+    join, shown, typed, under,
 };
 
 /// How much a finding weighs.
@@ -340,7 +340,11 @@ fn examine(dir: &str, files: &[&Content], committed: &BTreeMap<String, Vec<u8>>)
                 ),
                 "move the directory out of the .pile/ directory, then run pile init in it",
             ));
-        } else if c.path != config_file && c.path != intent_file && !is_toml(&c.path) {
+        } else if c.path != config_file
+            && c.path != intent_file
+            && !is_toml(&c.path)
+            && diagram_of(&c.path).is_none()
+        {
             row.findings.push(finding(
                 "unread-file",
                 Severity::Note,
