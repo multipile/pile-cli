@@ -179,3 +179,108 @@ fn a_diagram_is_drawn_as_a_page_a_picture_and_an_animation() {
     assert_eq!(&gif.bytes[..6], b"GIF89a");
     assert!(gif.duration_ms.is_some_and(|ms| ms > 0));
 }
+
+fn at(path: &str, source: &str) -> Diagram {
+    let name = path
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .trim_end_matches(".diagram");
+    Diagram {
+        name: name.into(),
+        dir: "/".into(),
+        path: path.into(),
+        source: Some(source.into()),
+    }
+}
+
+#[test]
+fn each_diagram_says_how_it_changed_since_a_revision() {
+    let kept = dependency("  box a pile=\"@storage\"\n  box b pile=\"@cli\"\n  line a b");
+    let then = vec![
+        at(
+            "/.pile/diagrams/edited.diagram",
+            &dependency("  box a\n  box b\n  line a b"),
+        ),
+        at("/.pile/diagrams/gone.diagram", &kept),
+        at("/.pile/diagrams/piles.diagram", &kept),
+        at(
+            "/.pile/diagrams/quiet.diagram",
+            &dependency("  box a pile=\"@cli\"\n  box b\n  line a b"),
+        ),
+    ];
+    let now = vec![
+        at("/.pile/diagrams/added.diagram", &kept),
+        at(
+            "/.pile/diagrams/edited.diagram",
+            &dependency("  box a\n  box c\n  line a c"),
+        ),
+        at("/.pile/diagrams/piles.diagram", &kept),
+        at(
+            "/.pile/diagrams/quiet.diagram",
+            &dependency("  box a pile=\"@cli\"\n  box b\n  line a b"),
+        ),
+    ];
+    let found = changes(&then, &now, |pile| pile == "@storage");
+    let words: Vec<(&str, Option<&str>)> = found
+        .iter()
+        .map(|(d, c)| (d.name.as_str(), c.as_ref().map(Change::word)))
+        .collect();
+    assert_eq!(
+        words,
+        vec![
+            ("added", Some("added")),
+            ("edited", Some("edited")),
+            ("gone", Some("removed")),
+            ("piles", Some("piles")),
+            ("quiet", None),
+        ]
+    );
+    let piles = found.iter().find(|(d, _)| d.name == "piles").unwrap();
+    assert_eq!(piles.1, Some(Change::Piles(vec!["@storage".to_string()])));
+}
+
+#[test]
+fn a_diagram_names_each_pile_once_in_the_order_it_names_them() {
+    let d = diagram(&dependency(
+        "  box a pile=\"@cli\"\n  box b pile=\"@storage\"\n  box c pile=\"@cli\"\n  line a b",
+    ));
+    assert_eq!(shown_piles(&d), vec!["@cli", "@storage"]);
+    assert!(shown_piles(&diagram("not kdl {")).is_empty());
+}
+
+#[test]
+fn a_change_is_drawn_as_a_diff_and_touched_piles_as_marks() {
+    let before = diagram_format::read(&dependency("  box a\n  box b\n  line a b")).unwrap();
+    let after = diagram_format::read(&dependency("  box a\n  box c\n  line a c")).unwrap();
+    let html = draw_diff(&before.diagram, &after.diagram, As::Html)
+        .unwrap()
+        .unwrap();
+    let page = String::from_utf8(html.bytes).unwrap();
+    assert!(
+        page.contains("data-added=\"2\"") && page.contains("data-removed=\"2\""),
+        "{page}"
+    );
+    let gif = draw_diff(&before.diagram, &after.diagram, As::Gif)
+        .unwrap()
+        .unwrap();
+    assert!(gif.duration_ms.is_some_and(|ms| ms > 0));
+    let tree = diagram_format::read(
+        "diagram tree version=1 {\n  title \"T\"\n  desc \"A tree.\"\n  item \"root\"\n}\n",
+    )
+    .unwrap();
+    assert!(
+        draw_diff(&before.diagram, &tree.diagram, As::Png).is_none(),
+        "two types"
+    );
+
+    let shown =
+        diagram_format::read(&dependency("  box a pile=\"@cli\"\n  box b\n  line a b")).unwrap();
+    let marked = draw_marked(&shown.diagram, |pile| pile == "@cli", As::Html).unwrap();
+    let page = String::from_utf8(marked.bytes).unwrap();
+    assert!(page.contains("data-changed=\"1\""), "{page}");
+    assert!(
+        draw_marked(&shown.diagram, |_| true, As::Gif).is_err(),
+        "a marked diagram is still"
+    );
+}

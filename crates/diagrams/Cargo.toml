@@ -15,7 +15,7 @@ piles = { path = "../piles" }
 # the reader of a .diagram file and the rules it holds a diagram to; the
 # document a diagram is painted into; the page written from it; and the
 # picture takumi renders from it.
-diagram-format = { git = "https://github.com/multipile/diagrams", rev = "c7a2b56c600dcc57ba2c97e4a4a03dd8a5749064" }
-diagram-document = { git = "https://github.com/multipile/diagrams", rev = "c7a2b56c600dcc57ba2c97e4a4a03dd8a5749064" }
-diagram-html = { git = "https://github.com/multipile/diagrams", rev = "c7a2b56c600dcc57ba2c97e4a4a03dd8a5749064" }
-diagram-render = { git = "https://github.com/multipile/diagrams", rev = "c7a2b56c600dcc57ba2c97e4a4a03dd8a5749064" }
+diagram-format = { git = "https://github.com/multipile/diagrams", rev = "07d475924b007b4308e5c6a3080eee29b1e8c781" }
+diagram-document = { git = "https://github.com/multipile/diagrams", rev = "07d475924b007b4308e5c6a3080eee29b1e8c781" }
+diagram-html = { git = "https://github.com/multipile/diagrams", rev = "07d475924b007b4308e5c6a3080eee29b1e8c781" }
+diagram-render = { git = "https://github.com/multipile/diagrams", rev = "07d475924b007b4308e5c6a3080eee29b1e8c781" }
