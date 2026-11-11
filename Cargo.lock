@@ -246,7 +246,7 @@ dependencies = [
 [[package]]
 name = "diagram-document"
 version = "0.1.0"
-source = "git+https://github.com/multipile/diagrams?rev=85c2eeabb79eaa173d5ed16cba75fc21b7d0a1e3#85c2eeabb79eaa173d5ed16cba75fc21b7d0a1e3"
+source = "git+https://github.com/multipile/diagrams?rev=07d475924b007b4308e5c6a3080eee29b1e8c781#07d475924b007b4308e5c6a3080eee29b1e8c781"
 dependencies = [
  "diagram-format",
 ]
@@ -254,7 +254,7 @@ dependencies = [
 [[package]]
 name = "diagram-format"
 version = "0.1.0"
-source = "git+https://github.com/multipile/diagrams?rev=85c2eeabb79eaa173d5ed16cba75fc21b7d0a1e3#85c2eeabb79eaa173d5ed16cba75fc21b7d0a1e3"
+source = "git+https://github.com/multipile/diagrams?rev=07d475924b007b4308e5c6a3080eee29b1e8c781#07d475924b007b4308e5c6a3080eee29b1e8c781"
 dependencies = [
  "kdl",
 ]
@@ -262,7 +262,7 @@ dependencies = [
 [[package]]
 name = "diagram-html"
 version = "0.1.0"
-source = "git+https://github.com/multipile/diagrams?rev=85c2eeabb79eaa173d5ed16cba75fc21b7d0a1e3#85c2eeabb79eaa173d5ed16cba75fc21b7d0a1e3"
+source = "git+https://github.com/multipile/diagrams?rev=07d475924b007b4308e5c6a3080eee29b1e8c781#07d475924b007b4308e5c6a3080eee29b1e8c781"
 dependencies = [
  "base64",
  "diagram-document",
@@ -271,7 +271,7 @@ dependencies = [
 [[package]]
 name = "diagram-render"
 version = "0.1.0"
-source = "git+https://github.com/multipile/diagrams?rev=85c2eeabb79eaa173d5ed16cba75fc21b7d0a1e3#85c2eeabb79eaa173d5ed16cba75fc21b7d0a1e3"
+source = "git+https://github.com/multipile/diagrams?rev=07d475924b007b4308e5c6a3080eee29b1e8c781#07d475924b007b4308e5c6a3080eee29b1e8c781"
 dependencies = [
  "diagram-document",
  "takumi",
