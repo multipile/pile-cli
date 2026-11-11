@@ -1,0 +1,21 @@
+[package]
+name = "diagrams"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Every declaration is read through the storage interface.
+storage = { path = "../storage" }
+# What a pile is, and doctor's findings, which a diagram's are added to.
+piles = { path = "../piles" }
+# multipile's diagrams (github.com/multipile/diagrams), pinned to a commit:
+# the reader of a .diagram file and the rules it holds a diagram to; the
+# document a diagram is painted into; the page written from it; and the
+# picture takumi renders from it.
+diagram-format = { git = "https://github.com/multipile/diagrams", rev = "c7a2b56c600dcc57ba2c97e4a4a03dd8a5749064" }
+diagram-document = { git = "https://github.com/multipile/diagrams", rev = "c7a2b56c600dcc57ba2c97e4a4a03dd8a5749064" }
+diagram-html = { git = "https://github.com/multipile/diagrams", rev = "c7a2b56c600dcc57ba2c97e4a4a03dd8a5749064" }
+diagram-render = { git = "https://github.com/multipile/diagrams", rev = "c7a2b56c600dcc57ba2c97e4a4a03dd8a5749064" }

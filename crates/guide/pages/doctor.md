@@ -1,7 +1,7 @@
 +++
 role = reference
 summary = what doctor's findings and severities mean, and when it must exit 0
-see = commit-a-change answers intent piles declarations
+see = commit-a-change answers intent piles declarations diagrams
 +++
 `pile doctor` says what every pile is, and what is wrong with any of them.
 It is the one command with a verdict: it exits 1 when it finds a problem.
@@ -18,9 +18,11 @@ read, because reporting a broken pile is what it is for. When another
 command refuses over the repository, run `pile doctor` to find out why.
 
 doctor writes nothing. It reads what piles are (their configs, their
-intents and where they sit) and the `.toml` files in each `.pile/`, whose
-every table it checks against the format (`pile guide declarations`). It
-never reads what a pile's other files say.
+intents and where they sit), the `.toml` files in each `.pile/`, whose
+every table it checks against the format (`pile guide declarations`), and
+the diagrams in each `.pile/diagrams/` (`pile guide diagrams`). It never
+reads what a pile's other files say. `pile doctor --diagrams` checks the
+diagrams and nothing else.
 
 ## A finding says what is wrong, and what fixes it
 

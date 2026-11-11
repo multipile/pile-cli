@@ -50,6 +50,25 @@ pub fn is_toml(path: &str) -> bool {
     path.ends_with(TOML)
 }
 
+/// The directory in a `.pile/` that holds the pile's diagrams.
+pub const DIAGRAMS_DIR: &str = "diagrams";
+/// What a diagram's file name ends in.
+pub const DIAGRAM: &str = ".diagram";
+
+/// The directory whose `.pile/` holds a diagram, and the diagram's name,
+/// when path is one: a file directly in a `.pile/diagrams/`, whose name ends
+/// in `.diagram`. crates/diagrams reads each one, so none is an unread file.
+/// `/lib/.pile/diagrams/crates.diagram` is the diagram `crates` of `/lib`.
+pub fn diagram_of(path: &str) -> Option<(String, String)> {
+    let (dir, rest) = doctor::split(path)?;
+    let file = rest.strip_prefix(DIAGRAMS_DIR)?.strip_prefix('/')?;
+    let name = file.strip_suffix(DIAGRAM)?;
+    if name.is_empty() || name.contains('/') {
+        return None;
+    }
+    Some((dir, name.to_string()))
+}
+
 /// Where something is written in a file: its line and its column, each
 /// counting from one. A column counts characters, not bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

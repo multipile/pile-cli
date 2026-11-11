@@ -9,6 +9,7 @@ pile show       # one pile whole: its config, where it sits, its intent
 pile status     # what changed since the last commit, by pile
 pile gitdiff    # what changed between two revisions, by pile, as git diff names them
 pile doctor     # what every pile is, and what is wrong with any of them
+pile diagram    # draw a diagram a pile keeps, as a page, a picture or an animation
 ```
 
 `pile --help` lists every command. `pile` makes no commit: git keeps the versions, the content and the history.

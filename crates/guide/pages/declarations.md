@@ -1,14 +1,14 @@
 +++
 role = reference
 summary = the .toml files in a .pile/: their version, and what each table declares
-see = types aux links doctor piles
+see = types aux links doctor piles diagrams
 +++
 Every `.toml` file in a pile's `.pile/` is a declaration file `pile` reads,
 whatever its name. A table says what it declares by its header, so the
 file it sits in decides nothing. By convention an aux pile writes its
 types in `types.toml`, and a pile writes its nodes in `nodes.toml`, its
 links in `links.toml` and its own values in `pile.toml`. Any other file in
-a `.pile/`, besides the config and the intent, is an unread file.
+a `.pile/`, but the config, the intent and the diagrams, is an unread file.
 
 What a repository declares is a graph. Each pile is a **node**, and a pile
 may declare other nodes, such as something outside the repository it

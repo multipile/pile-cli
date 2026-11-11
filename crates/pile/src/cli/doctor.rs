@@ -26,7 +26,13 @@ pub(super) fn command() -> Command {
              nothing. It reads what piles are (their configs, their intents and where\n\
              they sit) and what the .toml files in each .pile/ declare: types, nodes,\n\
              links and a pile's own values, each checked against the format\n\
-             (pile guide declarations). It never reads a pile's other files.\n\n\
+             (pile guide declarations), and the diagrams in each .pile/diagrams/,\n\
+             each held to its format and to the piles it names (pile guide\n\
+             diagrams). It never reads a pile's other files.\n\n\
+             --diagrams checks the diagrams and nothing else. Its report has a block\n\
+             for each diagram, in path order, headed by its name and its file, then\n\
+             the pile that keeps it and a line for each finding, and it exits 1 when\n\
+             a diagram has a problem.\n\n\
              The report has a block for each .pile/ directory, in path order. A block\n\
              is headed by the pile as every report heads it, then:\n  \
              - parent: the pile it sits in\n  \
@@ -65,6 +71,10 @@ pub(super) fn command() -> Command {
              declared-twice           written twice, so neither is read: keep one\n  \
              reserved-name            pile as a type or a node; id, name, path, headline in [pile]\n  \
              types-outside-aux        a type is created only in an aux pile\n\
+             In a diagram, each at its line and column:\n  \
+             diagram-invalid          it breaks a rule of its format: fix what it says\n  \
+             diagram-no-such-pile     it names a pile none answers to: name one there is\n  \
+             diagram-pile-id-differs  the name and the id it gives are two piles\n\
              A warning is something to put right that breaks nothing yet. doctor\n\
              still exits 0:\n  \
              no-name                  typed by its path: pile set name gives it one\n  \
@@ -76,16 +86,18 @@ pub(super) fn command() -> Command {
              unmade                   the config is gone, and its removal is not committed\n  \
              holds-repository         another repository inside a pile, read by none",
         )
-        .override_usage("pile doctor [--full]")
+        .override_usage("pile doctor [--full] [--diagrams]")
         .after_help(
             "Examples:\n  \
-             pile doctor          every pile, and what is wrong with any of them\n  \
-             pile doctor --full   with whole ids and whole headlines\n\n\
+             pile doctor              every pile, and what is wrong with any of them\n  \
+             pile doctor --full       with whole ids and whole headlines\n  \
+             pile doctor --diagrams   only the diagrams, and what is wrong with each\n\n\
              Refusals:\n  \
              problems-found           1  the report is printed whole: fix what it lists",
         )
         .arg(no_positional())
         .arg(switch("full", "print whole ids and whole headlines"))
+        .arg(switch("diagrams", "check the diagrams and nothing else"))
 }
 
 /// The result is `piles`, a row for each .pile/ directory in path order, and
@@ -108,6 +120,10 @@ pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
     let found = r.storage().declarations(&State::Working)?;
     let mut s = survey_of(r.storage(), &found)?;
     graph::check(&mut s, &found);
+    if m.get_flag("diagrams") {
+        return only_diagrams(out, &s, &found);
+    }
+    diagrams::check(&mut s, &found);
     if s.rows.is_empty() && s.in_no_pile.is_empty() {
         let top = r.top()?;
         putln!(out, "no pile in {}", top.display());
@@ -197,6 +213,97 @@ fn report(out: &mut Out, s: &Survey, full: bool) {
         }
     }
     putln!(out, "\n{}", total(s));
+}
+
+/// `doctor --diagrams`: a block for each diagram, and a verdict on them
+/// alone.
+///
+/// The result is `diagrams`, each `name`, `path`, `pile` (`name`, `path`
+/// and `id`, or `null` where its `.pile/` is not a pile's) and `problems`,
+/// a list of findings; and `total`, which is `diagrams`,
+/// `needing_attention` and `problems`. When a diagram has a problem, the
+/// answer refuses as `problems-found`, and the result is still the whole
+/// report.
+fn only_diagrams(out: &mut Out, s: &Survey, found: &[storage::Content]) -> Result {
+    let named = diagrams::named(s);
+    let all = diagrams::found(found);
+    if all.is_empty() {
+        putln!(out, "no diagram in any pile");
+        out.next(
+            "pile guide diagrams",
+            "says what a diagram is, and where a pile keeps one",
+        );
+        out.result(json!({
+            "diagrams": [],
+            "total": {"diagrams": 0, "needing_attention": 0, "problems": 0},
+        }));
+        return Ok(());
+    }
+    let mut blocks = Vec::new();
+    let (mut problems, mut ailing) = (0, 0);
+    for (i, d) in all.iter().enumerate() {
+        if i > 0 {
+            putln!(out);
+        }
+        let findings = diagrams::findings(d, &named);
+        putln!(out, "{}  {}", d.name, shown(&d.path));
+        let cfg = s.find(&d.dir).and_then(|row| row.config.as_ref());
+        match cfg {
+            Some(cfg) => say(
+                out,
+                "pile",
+                &piles::heading(&cfg.name, &d.dir, piles::short(&cfg.id)),
+            ),
+            None => say(out, "pile", &format!("{} (not a pile)", shown(&d.dir))),
+        }
+        for f in &findings {
+            say(out, f.severity.word(), &line(f));
+        }
+        if findings.is_empty() {
+            say(out, "ok", "nothing to report");
+        } else {
+            ailing += 1;
+        }
+        problems += findings.len();
+        blocks.push(json!({
+            "name": d.name,
+            "path": shown(&d.path),
+            "pile": cfg.map_or(Value::Null, |c| json!({
+                "name": name_of(&c.name),
+                "path": shown(&d.dir),
+                "id": c.id,
+            })),
+            "problems": findings.iter().map(finding).collect::<Vec<_>>(),
+        }));
+    }
+    let count = plural(all.len(), "diagram");
+    if problems == 0 {
+        putln!(out, "\n{count}, nothing wrong");
+    } else {
+        putln!(
+            out,
+            "\n{count}, {ailing} needing attention: {}",
+            plural(problems, "problem")
+        );
+    }
+    out.result(json!({
+        "diagrams": blocks,
+        "total": {"diagrams": all.len(), "needing_attention": ailing, "problems": problems},
+    }));
+    if problems > 0 {
+        return Err(Refusal::new(
+            Code::ProblemsFound,
+            format!(
+                "{} found in the diagrams, so doctor exits 1. Fix what the report lists",
+                plural(problems, "problem")
+            ),
+        )
+        .next(
+            "pile guide diagrams",
+            "says what a diagram may say, and how doctor checks it",
+        ));
+    }
+    Ok(())
 }
 
 /// A finding as a line: where it is, what is wrong, and what fixes it.

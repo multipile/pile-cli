@@ -13,6 +13,7 @@ mod answers;
 mod aux;
 mod completion;
 mod declare;
+mod diagram;
 mod doctor;
 mod files;
 mod gitdiff;
