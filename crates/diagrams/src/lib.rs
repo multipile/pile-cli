@@ -291,20 +291,60 @@ pub struct Drawn {
     pub duration_ms: Option<u32>,
 }
 
-/// Draws a diagram that reads.
+/// Draws a diagram that reads: still as a page or a picture, and revealed
+/// as a gif.
 pub fn draw(diagram: &diagram_format::Diagram, as_: As) -> Result<Drawn, String> {
     use diagram_document::Animation;
     let still = diagram_document::document(diagram, Animation::None);
+    let moving = (as_ == As::Gif).then(|| diagram_document::document(diagram, Animation::Reveal));
+    draw_documents(&still, moving.as_ref(), as_)
+}
+
+/// Draws a diagram's two versions as one: still, the second with what was
+/// added, removed and changed marked, and listed under it; as a gif, the
+/// first becoming the second. None when the two are of different types.
+pub fn draw_diff(
+    before: &diagram_format::Diagram,
+    after: &diagram_format::Diagram,
+    as_: As,
+) -> Option<Result<Drawn, String>> {
+    let still = diagram_document::diff_document(before, after, false).ok()?;
+    let moving = match as_ {
+        As::Gif => Some(diagram_document::diff_document(before, after, true).ok()?),
+        _ => None,
+    };
+    Some(draw_documents(&still, moving.as_ref(), as_))
+}
+
+/// Draws a diagram with the boxes of the piles `marked` says a change
+/// touched marked, each pile as the file names it. It is still, so it is
+/// drawn as a page or a picture, and never as a gif.
+pub fn draw_marked(
+    diagram: &diagram_format::Diagram,
+    marked: impl Fn(&str) -> bool,
+    as_: As,
+) -> Result<Drawn, String> {
+    let still = diagram_document::changed_document(diagram, marked);
+    draw_documents(&still, None, as_)
+}
+
+/// A document written as a page, rendered as a picture, or, given the
+/// document that moves, as a gif.
+fn draw_documents(
+    still: &diagram_document::Document,
+    moving: Option<&diagram_document::Document>,
+    as_: As,
+) -> Result<Drawn, String> {
     let (width, height) = (still.width, still.height);
-    match as_ {
-        As::Html => Ok(Drawn {
-            bytes: diagram_html::page(&still, &diagram_html::Options::default()).into_bytes(),
+    match (as_, moving) {
+        (As::Html, _) => Ok(Drawn {
+            bytes: diagram_html::page(still, &diagram_html::Options::default()).into_bytes(),
             width,
             height,
             duration_ms: None,
         }),
-        As::Png => diagram_render::Renderer::new()
-            .still(&still, diagram_render::StillFormat::Png, None)
+        (As::Png, _) => diagram_render::Renderer::new()
+            .still(still, diagram_render::StillFormat::Png, None)
             .map(|bytes| Drawn {
                 bytes,
                 width,
@@ -312,19 +352,102 @@ pub fn draw(diagram: &diagram_format::Diagram, as_: As) -> Result<Drawn, String>
                 duration_ms: None,
             })
             .map_err(|e| e.to_string()),
-        As::Gif => {
-            let revealed = diagram_document::document(diagram, Animation::Reveal);
-            diagram_render::Renderer::new()
-                .animation(&revealed, diagram_render::MotionFormat::Gif, 25)
-                .map(|bytes| Drawn {
-                    bytes,
-                    width: revealed.width,
-                    height: revealed.height,
-                    duration_ms: Some(revealed.duration_ms),
-                })
-                .map_err(|e| e.to_string())
+        (As::Gif, Some(moving)) => diagram_render::Renderer::new()
+            .animation(moving, diagram_render::MotionFormat::Gif, 25)
+            .map(|bytes| Drawn {
+                bytes,
+                width: moving.width,
+                height: moving.height,
+                duration_ms: Some(moving.duration_ms),
+            })
+            .map_err(|e| e.to_string()),
+        (As::Gif, None) => {
+            Err("it is still, so it is drawn as html or png, not as a gif".to_string())
         }
     }
+}
+
+/// How a diagram changed since a revision.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Change {
+    /// Its file is new.
+    Added,
+    /// Its file changed.
+    Edited,
+    /// Its file did not change, and it shows piles the change touched: each
+    /// as the file names it, in the order it names them.
+    Piles(Vec<String>),
+    /// Its file is gone.
+    Removed,
+}
+
+impl Change {
+    pub fn word(&self) -> &'static str {
+        match self {
+            Change::Added => "added",
+            Change::Edited => "edited",
+            Change::Piles(_) => "piles",
+            Change::Removed => "removed",
+        }
+    }
+}
+
+/// Each diagram there is now, and each that is gone, in path order, with
+/// how it changed since a revision, or None. `then` are the diagrams at the
+/// revision, and `now` those of the working copy. `touched` says whether a
+/// pile a diagram names, as the file names it, is one the change touched.
+pub fn changes(
+    then: &[Diagram],
+    now: &[Diagram],
+    touched: impl Fn(&str) -> bool,
+) -> Vec<(Diagram, Option<Change>)> {
+    let mut out: Vec<(Diagram, Option<Change>)> = now
+        .iter()
+        .map(|diagram| {
+            let before = then.iter().find(|d| d.path == diagram.path);
+            let change = match before {
+                None => Some(Change::Added),
+                Some(before) if before.source != diagram.source => Some(Change::Edited),
+                Some(_) => {
+                    let piles = shown_piles(diagram)
+                        .into_iter()
+                        .filter(|reference| touched(reference))
+                        .collect::<Vec<_>>();
+                    (!piles.is_empty()).then_some(Change::Piles(piles))
+                }
+            };
+            (diagram.clone(), change)
+        })
+        .collect();
+    for gone in then
+        .iter()
+        .filter(|d| !now.iter().any(|n| n.path == d.path))
+    {
+        out.push((gone.clone(), Some(Change::Removed)));
+    }
+    out.sort_by(|a, b| a.0.path.cmp(&b.0.path));
+    out
+}
+
+/// The piles a diagram that reads names, each once, as the file names
+/// them, in the order it names them. None for a diagram that does not read.
+pub fn shown_piles(diagram: &Diagram) -> Vec<String> {
+    let Some(read) = diagram
+        .source
+        .as_deref()
+        .and_then(|s| diagram_format::read(s).ok())
+    else {
+        return Vec::new();
+    };
+    let mut piles: Vec<String> = Vec::new();
+    for item in with_piles(&read.diagram.body) {
+        if let Some(pile) = &item.pile
+            && !piles.contains(&pile.reference)
+        {
+            piles.push(pile.reference.clone());
+        }
+    }
+    piles
 }
 
 #[cfg(test)]

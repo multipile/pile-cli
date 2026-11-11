@@ -69,3 +69,27 @@ file, as any other file in a `.pile/` is.
 Without `--as`, the name `-o` is given decides by its ending. Where two
 piles keep a diagram of one name, type it after its pile: `@lib/flow`.
 A diagram doctor finds a problem in is not drawn.
+
+`pile diagram list` lists the diagrams the piles keep, each with the name
+render takes.
+
+## Show what a change touched
+
+`--since <revision>` counts a change from a revision to the working
+copy, and `origin/main...` counts it from where the branch left main, as
+a pull request into main does. `pile diagram list --since <revision>`
+says how the change touches each diagram:
+
+- `added`: its file is new;
+- `edited`: its file changed;
+- `piles`: its file did not change, and it shows a pile the change
+  touched, as `pile gitdiff` counts a changed pile;
+- `removed`: its file is gone, so it is listed and not drawn.
+
+`pile diagram render --since <revision> <name>` draws a diagram with its
+change. An edited one is drawn as its two versions in one: a page or a
+picture shows the second with what was added, removed and changed
+marked, and listed under it, and a gif shows the first becoming the
+second. One that shows piles the change touched is drawn with their
+boxes marked, still, as a page or a picture. An added one is drawn as it
+is.

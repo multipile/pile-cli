@@ -269,3 +269,182 @@ fn diagram_alone_says_what_it_takes() {
     let e = r.refused(&["diagram"], 2);
     assert_eq!(e["error"]["code"], "usage");
 }
+
+/// The repository of [`with_diagram`] with three diagrams more, and a branch
+/// that changes them each a way: `deps` shows @lib, whose code changed;
+/// `flow` is edited; `gone` is removed; `new` is added; and `quiet` shows
+/// only @app, whose code did not change.
+fn with_change() -> Repo {
+    let r = with_diagram();
+    r.write("app/.pile/diagrams/flow.diagram", DEPS);
+    r.write("app/.pile/diagrams/gone.diagram", DEPS);
+    r.write(
+        "app/.pile/diagrams/quiet.diagram",
+        &DEPS.replace("pile=\"@lib\"", ""),
+    );
+    r.write("lib/code.rs", "one\n");
+    r.commit("diagrams");
+    r.git(&["switch", "-q", "-c", "feature"]);
+    r.write("lib/code.rs", "two\n");
+    r.write(
+        "app/.pile/diagrams/flow.diagram",
+        &DEPS.replace(
+            "  line app lib",
+            "  box db \"db\"\n  line app lib\n  line lib db",
+        ),
+    );
+    std::fs::remove_file(r.path().join("app/.pile/diagrams/gone.diagram")).unwrap();
+    r.write("app/.pile/diagrams/new.diagram", DEPS);
+    r.commit("change");
+    r
+}
+
+/// Each diagram's name and how it changed, as pile diagram list gives them.
+fn changes(v: &serde_json::Value) -> Vec<(String, serde_json::Value)> {
+    v["diagrams"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| (d["name"].as_str().unwrap().to_string(), d["change"].clone()))
+        .collect()
+}
+
+#[test]
+fn list_names_every_diagram_with_its_pile_and_file() {
+    let r = with_diagram();
+    let v = r.result(&["diagram", "list"]);
+    assert_eq!(v["total"]["diagrams"], 1, "{v}");
+    let d = &v["diagrams"][0];
+    assert_eq!(d["name"], "deps");
+    assert_eq!(d["handle"], "deps");
+    assert_eq!(d["pile"]["name"], "app");
+    assert_eq!(d["path"], ":/app/.pile/diagrams/deps.diagram");
+    assert!(
+        d.get("change").is_none(),
+        "without --since nothing is said of a change: {d}"
+    );
+}
+
+#[test]
+fn list_since_says_how_a_change_touches_each_diagram() {
+    let r = with_change();
+    let v = r.result(&["diagram", "list", "--since", "main..."]);
+    let found = changes(&v);
+    let word = |name: &str| found.iter().find(|(n, _)| n == name).unwrap().1.clone();
+    assert_eq!(word("deps"), "piles", "{v}");
+    assert_eq!(word("flow"), "edited", "{v}");
+    assert_eq!(word("gone"), "removed", "{v}");
+    assert_eq!(word("new"), "added", "{v}");
+    assert_eq!(word("quiet"), serde_json::Value::Null, "{v}");
+    let deps = v["diagrams"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|d| d["name"] == "deps")
+        .unwrap();
+    assert_eq!(
+        deps["piles"],
+        serde_json::json!(["@lib"]),
+        "only the pile whose code changed, not the one whose diagrams did"
+    );
+    assert_eq!(v["total"]["changed"], 4);
+    assert_eq!(v["since"]["name"], "main...");
+}
+
+#[test]
+fn list_since_counts_the_working_copy_from_a_plain_revision() {
+    let r = with_diagram();
+    r.write("lib/code.rs", "one\n");
+    r.commit("code");
+    // A change not yet committed counts; an untracked file, as in pile
+    // gitdiff, does not.
+    r.write("lib/code.rs", "two\n");
+    let v = r.result(&["diagram", "list", "--since", "HEAD"]);
+    assert_eq!(changes(&v)[0].1, "piles", "{v}");
+}
+
+#[test]
+fn render_since_draws_an_edited_diagram_as_its_two_versions() {
+    let r = with_change();
+    let v = r.result(&[
+        "diagram", "render", "--since", "main...", "--as", "gif", "flow",
+    ]);
+    assert_eq!(v["change"], "edited");
+    assert!(
+        v["duration_ms"].as_u64().unwrap() > 0,
+        "the first becoming the second"
+    );
+    assert_eq!(
+        &std::fs::read(r.path().join("flow.gif")).unwrap()[..6],
+        b"GIF89a"
+    );
+    let v = r.result(&[
+        "diagram", "render", "--since", "main...", "--as", "png", "flow",
+    ]);
+    assert_eq!(v["duration_ms"], serde_json::Value::Null);
+    r.result(&["diagram", "render", "--since", "main...", "flow"]);
+    let page = r.read("flow.html");
+    assert!(
+        page.contains("data-added=\"2\""),
+        "the db box and the line to it are marked"
+    );
+}
+
+#[test]
+fn render_since_marks_the_piles_a_change_touched_and_is_still() {
+    let r = with_change();
+    let v = r.result(&["diagram", "render", "--since", "main...", "deps"]);
+    assert_eq!(v["change"], "piles");
+    assert_eq!(v["piles"], serde_json::json!(["@lib"]));
+    assert!(r.read("deps.html").contains("data-changed=\"1\""));
+    let v = r.result(&[
+        "diagram", "render", "--since", "main...", "--as", "png", "deps",
+    ]);
+    assert_eq!(
+        &std::fs::read(r.path().join("deps.png")).unwrap()[..4],
+        b"\x89PNG"
+    );
+    assert_eq!(v["as"], "png");
+    let e = r.refused(
+        &[
+            "diagram", "render", "--since", "main...", "--as", "gif", "deps",
+        ],
+        2,
+    );
+    assert_eq!(e["error"]["code"], "diagram-still");
+}
+
+#[test]
+fn render_since_draws_an_added_diagram_as_it_is_and_refuses_a_removed_one() {
+    let r = with_change();
+    let v = r.result(&[
+        "diagram", "render", "--since", "main...", "--as", "gif", "new",
+    ]);
+    assert_eq!(v["change"], "added");
+    assert!(v["duration_ms"].as_u64().unwrap() > 0, "the reveal");
+    let e = r.refused(&["diagram", "render", "--since", "main...", "gone"], 1);
+    assert_eq!(e["error"]["code"], "no-such-diagram");
+    assert!(
+        e["error"]["message"].as_str().unwrap().contains("removed"),
+        "{e}"
+    );
+}
+
+#[test]
+fn render_since_refuses_an_edited_diagram_whose_earlier_version_does_not_read() {
+    let r = with_diagram();
+    r.write("app/.pile/diagrams/flow.diagram", "not a diagram {");
+    r.commit("broken");
+    r.write("app/.pile/diagrams/flow.diagram", DEPS);
+    let e = r.refused(&["diagram", "render", "--since", "HEAD", "flow"], 1);
+    assert_eq!(e["error"]["code"], "diagram-not-comparable");
+}
+
+#[test]
+fn since_refuses_a_revision_there_is_not() {
+    let r = with_diagram();
+    let e = r.refused(&["diagram", "list", "--since", "nowhere"], 2);
+    assert_eq!(e["error"]["code"], "unknown-revision");
+    let e = r.refused(&["diagram", "render", "--since", "a..b", "deps"], 2);
+    assert_eq!(e["error"]["code"], "usage");
+}
