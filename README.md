@@ -2,6 +2,9 @@
 
 `pile` is the command-line tool of multipile. multipile declares structure inside a git repository. A **pile** is a subtree with a `.pile/` directory that says what it is and why it is one thing.
 
+> [!NOTE]
+> **multipile is in early development.** Commands, file formats and output can still change between releases. Try it, and [tell us what you find](https://github.com/multipile/pile-cli/issues).
+
 ```sh
 pile guide      # how to work in a repository of piles: start here
 pile list       # every pile the repository declares
