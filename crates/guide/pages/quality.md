@@ -32,7 +32,8 @@ a change that belongs. One change gets one finding.
 
 A rewritten intent is held to its base too. It is **worse** when it is:
 
-1. vaguer: the headline became a topic, a list, or says "and" twice;
+1. vaguer: the headline became a role, a topic, a list, or says "and"
+   twice;
 2. wider only to admit this change: it adds ground nothing else in the
    pile holds;
 3. claiming another pile's ground: what its parent, a child or a sibling
