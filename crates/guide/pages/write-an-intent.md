@@ -39,7 +39,8 @@ pile list
 
 Look for how the parent and the piles beside this one write a headline and
 a closing pair. Match their shape, and do not claim what one of them
-claims.
+claims. Note what each of them claims: step 4 asks which of them admits
+what yours says does not belong.
 
 ### 3. Read what the pile holds, and what has changed it
 
@@ -53,9 +54,9 @@ piles it changes together with. The authors are who to ask what it is for.
 
 ### 4. Write the draft, and ask doctor about it
 
-Write `.pile/intent.md`: the headline, what belongs, and the closing pair,
-with no heading. When you rewrite, replace the sentences that became
-untrue.
+Write `.pile/intent.md`: the headline, what belongs and at least one sort
+of thing that does not, and the closing pair, with no heading. When you
+rewrite, replace the sentences that became untrue.
 
 ```sh
 pile doctor
@@ -64,6 +65,11 @@ pile doctor
 Look for the pile with no finding on its intent, and read the headline
 doctor prints beside it. Hold the draft to the four tests
 (`pile guide intent`).
+
+Then take what the draft says does not belong, and look for the pile whose
+intent admits it, among the intents you read in step 2. If no intent
+admits it, ask the person where it goes: that is a question about the
+boundary.
 
 ### 5. Hand it back, and wait
 
@@ -79,6 +85,8 @@ change it as they say.
 
 - `pile doctor` reports nothing about this pile's intent.
 - The intent starts with its headline, and ends with its closing pair.
+- It says at least one sort of thing that does not belong, and a change
+  alone settles whether something is of that sort.
 - A person approved it.
 - A rewrite replaced what became untrue, and added nothing beside it.
 
