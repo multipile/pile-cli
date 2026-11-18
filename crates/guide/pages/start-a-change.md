@@ -2,7 +2,7 @@
 role = workflow
 summary = find the piles a change belongs in, and read each before writing
 needs = reading
-see = write-an-intent commit-a-change paths links
+see = write-an-intent commit-a-change paths links boundary-note
 +++
 ## When to use
 
@@ -76,4 +76,6 @@ without saying so.
 Before you write anything: the piles the change is in, the sentence of
 each intent that admits it, the links it touches with the pile at each
 other end, and any intent that looked out of date. Then
-make the change, and commit it as `pile guide commit-a-change` says.
+make the change, and commit it as `pile guide commit-a-change` says. A
+boundary that looked untrue is reported then, in a boundary note
+(`pile guide boundary-note`).

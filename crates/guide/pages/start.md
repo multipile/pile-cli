@@ -2,7 +2,7 @@
 role = start
 summary = where a session begins, and how to read the rest of the guide
 needs = piles paths
-see = adopt start-a-change write-an-intent commit-a-change read-a-change review reading intent boundaries doctor quality declarations types aux links diagrams answers agent-mode
+see = adopt refine start-a-change write-an-intent commit-a-change read-a-change review reading intent boundaries leaves relies-on boundary-note reshaping doctor quality declarations types aux links diagrams answers agent-mode
 +++
 This is `pile guide`: pages of prose that the `pile` binary carries, about
 the binary that printed them. Read this page and the two printed under it
@@ -40,6 +40,7 @@ back.
 Print it, and follow it in order. Do not carry one out from memory.
 
 - `pile guide adopt`: a project that declares no pile yet.
+- `pile guide refine`: the piles a repository declares, made stabler.
 - `pile guide start-a-change`: before you write in a file, to find the pile
   it is in and read that pile first.
 - `pile guide write-an-intent`: a pile whose intent is missing, still a
@@ -53,6 +54,10 @@ Print it, and follow it in order. Do not carry one out from memory.
 - `pile guide reading`: which command reads what, and when to reach for it.
 - `pile guide intent`: before you write or change an intent.
 - `pile guide boundaries`: when you decide whether a subtree is one pile.
+- `pile guide leaves`: which directories are piles.
+- `pile guide relies-on`: what one pile relies on of another.
+- `pile guide boundary-note`: a boundary you found untrue in a change.
+- `pile guide reshaping`: before you move, unmake or rename a pile.
 - `pile guide doctor`: what doctor's findings and severities mean.
 - `pile guide quality`: the words a review judges a change by, and its shape.
 - `pile guide declarations`: the `.toml` files in a `.pile/`, and what

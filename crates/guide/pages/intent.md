@@ -36,7 +36,9 @@ Read this pile to find out <X>. Change it when <Y>.
   here. Write it so that the change alone settles it: a reader can hold
   a diff to "anything that knows git", and cannot hold one to "anything
   too low-level". Say what sort of thing it is, and not which pile holds
-  it: that pile's own intent says so.
+  it: that pile's own intent says so. Name here, in a few words, each
+  part that other piles rely on, so that a link's title may name it: "the
+  parser that turns scripts into trees". It never goes in the headline.
 - **The closing pair** is the last two sentences. The first names what a
   reader opens the pile to find out: a question somebody arrives with. The
   second names where a change to the pile comes from: a decision,

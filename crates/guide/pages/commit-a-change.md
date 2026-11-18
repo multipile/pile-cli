@@ -2,7 +2,7 @@
 role = workflow
 summary = commit a change once doctor, status and each intent say it is ready
 needs = doctor
-see = write-an-intent read-a-change start-a-change links
+see = write-an-intent read-a-change start-a-change links boundary-note
 +++
 ## When to use
 
@@ -45,11 +45,15 @@ pile show <pile>
 ```
 
 Look for a sentence the change made untrue. If there is one, rewrite it in
-this commit (`pile guide write-an-intent`), and say so in the message.
+this commit (`pile guide write-an-intent`), and say so in the message. If
+no sentence of the intent covers the change, write a boundary note, and
+do not change the boundary (`pile guide boundary-note`). Read the lines
+the change adds, with `git diff HEAD -U0`, for the note's other signs.
 
 Where the change added, changed or removed a link, run `pile show` for the
 pile at each end of it. Look for a sentence of either intent that the link
-now contradicts, and for a link title the change made untrue.
+now contradicts, and for a link title the change made untrue. A title
+that would have to name a path inside another pile is a boundary note.
 
 ### 4. Commit with git
 
@@ -72,4 +76,4 @@ touched when it touched more than one, and why it was not split.
 ## What to hand back
 
 The commit's id, the piles it changed, and every warning or note doctor
-gave that is still there, with why it stays.
+gave that is still there, with why it stays. Then each boundary note.

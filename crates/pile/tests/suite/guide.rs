@@ -77,7 +77,7 @@ fn a_page_comes_with_what_it_needs_once_and_names_what_to_see() {
         .iter()
         .map(|p| p["name"].as_str().unwrap())
         .collect();
-    assert_eq!(printed, ["adopt", "intent", "boundaries"]);
+    assert_eq!(printed, ["adopt", "intent", "boundaries", "proposal"]);
     let next: Vec<&str> = v["next"]
         .as_array()
         .unwrap()
