@@ -1,0 +1,23 @@
+[package]
+name = "query"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# The base relations a program reads: the rows a database is filled with,
+# and the nodes and edges an answer leads back to.
+graph = { path = "../graph" }
+# Which pile is named what, and which pile holds which: a node is written by
+# its pile's name, and `parent` is derived from where the piles sit.
+piles = { path = "../piles" }
+# The Datalog a program is written in (github.com/multipile/datalog), pinned
+# to a commit: its parser, which refuses a mistake at its line and column,
+# and its evaluator.
+datalog = { git = "https://github.com/multipile/datalog", rev = "1c2b278c127ffc407ee1bbf7a479089e674b9b48" }
+
+[dev-dependencies]
+# The repositories the tests read are held in memory.
+storage = { path = "../storage" }

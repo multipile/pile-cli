@@ -1,7 +1,7 @@
 +++
 role = reference
 summary = which command reads what, and when to reach for each
-see = paths links doctor start-a-change read-a-change
+see = paths links doctor query start-a-change read-a-change
 +++
 These commands read the repository by pile. None of them writes, and none
 judges: `pile doctor` is the one with a verdict. Each command's help says
@@ -17,6 +17,7 @@ pile status                 # what changed since the last commit, by pile
 pile status --all --brief   # a line per pile, for the whole repository
 pile gitdiff <a>...<b>      # what b changed since it left a, by pile
 pile log <pile>             # the commits that changed one pile
+pile query '<program>'      # a question of your own, asked of what is declared
 pile doctor                 # what is wrong with any pile
 ```
 
@@ -36,6 +37,13 @@ may be owed at the other. `pile show` prints each link the pile is at one
 end of, with the node at the other end. When that node is a pile, read it
 too with `pile show`, before you change what the link says one end relies
 on (`pile guide links`).
+
+## Ask what no command prints
+
+`pile query` answers a question the other commands do not: which piles
+rely on this one through another, which carry a label, which no link
+reaches. The question is a short Datalog program, read against every
+node, link and type the repository declares (`pile guide query`).
 
 ## See what reading costs
 

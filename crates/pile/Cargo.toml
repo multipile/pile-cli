@@ -26,6 +26,9 @@ piles = { path = "../piles" }
 # What the piles' .toml files declare, as rows, and what doctor finds wrong
 # with them.
 graph = { path = "../graph" }
+# What the repository declares as a Datalog database, and a program asked
+# of it.
+query = { path = "../query" }
 # The pages pile guide prints, compiled in.
 guide = { path = "../guide" }
 # The diagrams a repository keeps, what doctor finds wrong with them, and

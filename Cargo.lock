@@ -223,6 +223,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be1e0bca6c3637f992fc1cc7cbc52a78c1ef6db076dbf1059c4323d6a2048376"
 
 [[package]]
+name = "datafrog"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0afaad2b26fa326569eb264b1363e8ae3357618c43982b3f285f0774ce76b69"
+
+[[package]]
+name = "datalog"
+version = "0.1.0"
+source = "git+https://github.com/multipile/datalog?rev=1c2b278c127ffc407ee1bbf7a479089e674b9b48#1c2b278c127ffc407ee1bbf7a479089e674b9b48"
+dependencies = [
+ "datafrog",
+ "datalog-syntax",
+]
+
+[[package]]
+name = "datalog-syntax"
+version = "0.1.0"
+source = "git+https://github.com/multipile/datalog?rev=1c2b278c127ffc407ee1bbf7a479089e674b9b48#1c2b278c127ffc407ee1bbf7a479089e674b9b48"
+
+[[package]]
 name = "derive_more"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -825,6 +845,7 @@ dependencies = [
  "graph",
  "guide",
  "piles",
+ "query",
  "serde_json",
  "storage",
  "tempfile",
@@ -889,6 +910,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "query"
+version = "0.0.0"
+dependencies = [
+ "datalog",
+ "graph",
+ "piles",
+ "storage",
 ]
 
 [[package]]

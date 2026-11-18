@@ -22,6 +22,7 @@ mod links;
 mod list;
 mod log;
 mod piles;
+mod query;
 mod show;
 mod status;
 mod version;
