@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use query::Answer;
 use storage::State;
 
-use super::{Out, Result, open, os_says, plural, target};
+use super::{Declared, Out, Result, open, os_says, plural, target};
 use crate::exit::{Code, Refusal};
 
 pub(super) fn command() -> Command {
@@ -173,7 +173,7 @@ pub(super) fn run(m: &ArgMatches, out: &mut Out) -> Result {
     if s.is_empty() {
         return Err(target::no_piles(&r));
     }
-    let db = ::query::database(&graph::relations(&s, &found), &s);
+    let db = Declared::of(&found, &s).db;
     let answers = match query::ask(&db, &program, |name| db.pile_named(name)) {
         Ok(answers) => answers,
         Err(refused) => {

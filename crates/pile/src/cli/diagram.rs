@@ -1,13 +1,14 @@
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use serde_json::json;
 
-use diagrams::{As, Change, Diagram};
+use diagrams::{As, Change, Diagram, Listed};
 use piles::{SIGIL, shown};
 use storage::{ChangeKind, Revision, State};
 
-use super::{Out, Result, name_of, open, os_says, plural, say, target};
+use super::{Declared, Out, Result, name_of, open, os_says, plural, say, target};
 use crate::exit::{Code, Refusal};
 
 pub(super) fn command() -> Command {
@@ -52,11 +53,18 @@ fn list_command() -> Command {
              working copy:\n  \
              added     its file is new\n  \
              edited    its file changed\n  \
-             piles     its file did not change, and it shows a pile the change\n            \
-             touched, as pile gitdiff counts a changed pile\n  \
+             piles     its file did not change, and the change touched something it\n            \
+             stands for: a pile, as pile gitdiff counts a changed pile, or\n            \
+             another node or a link, which is touched when it is added or\n            \
+             removed, or what it declares changes\n  \
              removed   its file is gone, so it is listed and not drawn\n\
-             A diagram the change does not touch says nothing. pile diagram render\n\
-             --since draws each one with its change.\n\n\
+             After piles comes each thing touched, as pile query writes one: @name\n\
+             for a pile, type:name for another node, and a link as its source, its\n\
+             type and its target. A diagram the change does not touch says none.\n\n\
+             With --since, each diagram also says what it misses: the nodes and the\n\
+             links its includes say it should show and it does not, in the working\n\
+             copy, whatever the change touched (pile guide diagram-includes).\n\
+             pile diagram render --since draws each one with its change.\n\n\
              {SINCE}"
         ))
         .override_usage("pile diagram list [--since <revision>]")
@@ -88,16 +96,17 @@ fn render_command() -> Command {
              .diagram. Where two piles keep a diagram of one name, the name is typed\n\
              after its pile: @lib/flow, or :/packages/lib/flow for a pile with no name.\n\
              The diagram's file, as a path on disk or a :/ path, names it too.\n\n\
-             A diagram that breaks a rule of its format, or names a pile the\n\
-             repository does not have, is not drawn: pile doctor --diagrams says\n\
-             what is wrong with each.\n\n\
+             A diagram that breaks a rule of its format, or has a box or a line that\n\
+             stands for nothing the repository declares, is not drawn: pile doctor\n\
+             --diagrams says what is wrong with each. One that only misses what it\n\
+             should show is still drawn.\n\n\
              --since draws the diagram with how a change touched it, as pile diagram\n\
              list says. An edited diagram is drawn as its two versions in one: as a\n\
              page or a picture, the second with what was added, removed and changed\n\
              marked, and listed under it; as a gif, the first becoming the second. A\n\
-             diagram that shows piles the change touched is drawn with those piles'\n\
-             boxes marked, and is still, so it is a page or a picture. An added\n\
-             diagram, or one the change does not touch, is drawn as it is. {SINCE}"
+             diagram that stands for something the change touched is drawn with each\n\
+             such box and line marked, and is still, so it is a page or a picture. An\n\
+             added diagram, or one the change does not touch, is drawn as it is. {SINCE}"
         ))
         .override_usage("pile diagram render [--since <revision>] [--as html|png|gif] [-o <file>] <diagram>")
         .after_help(
@@ -199,51 +208,112 @@ fn named_piles(s: &piles::Structure) -> Vec<diagrams::Named> {
         .collect()
 }
 
+/// A change since a revision: the diagrams there were at the revision, and
+/// what the change from there to the working copy touched.
+struct Changed {
+    then: Vec<Diagram>,
+    /// The ids of the piles whose files changed.
+    piles: BTreeSet<String>,
+    /// The other nodes, and the edges, that differ.
+    touched: graph::Touched,
+}
+
+fn changed_since(
+    r: &crate::repository::Repository,
+    s: &piles::Structure,
+    since: &Since,
+    declared: &Declared,
+) -> Result<Changed> {
+    let storage = r.storage();
+    let at = State::At(since.revision.clone());
+    let found = storage.declarations(&at)?;
+    let then = diagrams::found(&found);
+    let mut changed = storage.changes(Some(&since.revision), &State::Working)?;
+    // A pile whose diagrams alone changed did not change what it holds.
+    changed.retain(|c| c.kind != ChangeKind::Untracked && piles::diagram_of(&c.path).is_none());
+    let view = piles::changes::arrange(s, piles::ROOT, &changed);
+    // A pile is touched by its files.
+    let piles = view
+        .groups
+        .iter()
+        .filter(|g| g.changed())
+        .map(|g| g.pile.id.clone())
+        .collect();
+    // A node that is not a pile, and an edge, is touched by what it
+    // declares. Where the revision's declarations do not read, nothing says
+    // what they were, so none is.
+    let touched = piles::structure(&found)
+        .map(|s| graph::touched(&graph::relations(&s, &found), &declared.rows))
+        .unwrap_or_default();
+    Ok(Changed {
+        then,
+        piles,
+        touched,
+    })
+}
+
 /// Each diagram there is, and each that is gone since the revision, with
-/// how the change from the revision to the working copy touches it.
+/// how the change from the revision to the working copy touches it, and
+/// what it misses.
 fn changes_since(
     r: &crate::repository::Repository,
     s: &piles::Structure,
     now: &[Diagram],
     since: &Since,
-) -> Result<Vec<(Diagram, Option<Change>)>> {
-    let storage = r.storage();
-    let then = diagrams::found(&storage.declarations(&State::At(since.revision.clone()))?);
-    let mut changed = storage.changes(Some(&since.revision), &State::Working)?;
-    // A pile whose diagrams alone changed did not change what it holds.
-    changed.retain(|c| c.kind != ChangeKind::Untracked && piles::diagram_of(&c.path).is_none());
-    let view = piles::changes::arrange(s, piles::ROOT, &changed);
-    let touched: Vec<&str> = view
-        .groups
-        .iter()
-        .filter(|g| g.changed())
-        .map(|g| g.pile.path.as_str())
-        .collect();
-    let named = named_piles(s);
-    Ok(diagrams::changes(&then, now, |reference| {
-        diagrams::resolve(reference, &named).is_some_and(|p| touched.contains(&p.path.as_str()))
-    }))
+    declared: &Declared,
+) -> Result<Vec<Listed>> {
+    let changed = changed_since(r, s, since, declared)?;
+    Ok(diagrams::changes(
+        &changed.then,
+        now,
+        &named_piles(s),
+        Some(declared.graph()),
+        &changed.piles,
+        &changed.touched,
+    ))
+}
+
+/// How a change touches a diagram, as text says it: the word, and after
+/// `piles` each thing touched.
+fn change_said(change: Option<&Change>) -> String {
+    match change {
+        Some(Change::Piles(touched)) => format!("piles {}", touched.references.join(", ")),
+        Some(change) => change.word().to_string(),
+        None => "none".to_string(),
+    }
 }
 
 /// The result is `diagrams`, in path order, each `name`; `handle`, how it is
 /// typed to draw it; `pile`, the pile that keeps it (`name`, `path` and
 /// `id`), or `null` for a removed one whose pile is gone; and `path`, its
 /// file. With --since, each also has `change`, `added`, `edited`, `piles`,
-/// `removed` or `null`, and `piles`, the piles the change touched that it
-/// shows, as the file names them; and the result has `since`, `name` as
-/// typed and `revision`. `total` is `diagrams`, and with --since `changed`.
+/// `removed` or `null`; `piles`, the piles the change touched that it
+/// shows; `touched`, everything the change touched that it stands for,
+/// piles, other nodes and links, each as pile query writes one; and
+/// `misses`, the nodes and links it should show and does not. The result
+/// has `since`, `name` as typed and `revision`. `total` is `diagrams`, and
+/// with --since `changed`.
 fn list(m: &ArgMatches, out: &mut Out) -> Result {
     super::no_args("diagram list", m)?;
     let r = open()?;
-    let s = r.piles()?;
-    let now = diagrams::found(&r.storage().declarations(&State::Working)?);
+    let found = r.storage().declarations(&State::Working)?;
+    let s = piles::structure(&found)?;
+    let now = diagrams::found(&found);
     let since = since_of(&r, m)?;
-    let listed: Vec<(Diagram, Option<Change>)> = match &since {
-        Some(since) => changes_since(&r, &s, &now, since)?,
-        None => now.iter().map(|d| (d.clone(), None)).collect(),
+    let listed: Vec<Listed> = match &since {
+        Some(since) => changes_since(&r, &s, &now, since, &Declared::of(&found, &s))?,
+        None => now
+            .iter()
+            .map(|d| Listed {
+                diagram: d.clone(),
+                change: None,
+                misses: Vec::new(),
+            })
+            .collect(),
     };
     let mut rows = Vec::new();
-    for (i, (diagram, change)) in listed.iter().enumerate() {
+    for (i, one) in listed.iter().enumerate() {
+        let (diagram, change) = (&one.diagram, &one.change);
         if i > 0 {
             putln!(out);
         }
@@ -253,17 +323,11 @@ fn list(m: &ArgMatches, out: &mut Out) -> Result {
         if let Some(p) = pile {
             say(out, "pile", &p.heading());
         }
-        let piles: Vec<String> = match change {
-            Some(Change::Piles(piles)) => piles.clone(),
-            _ => Vec::new(),
-        };
+        let touched = change.as_ref().and_then(Change::touched);
         if since.is_some() {
-            match change {
-                Some(Change::Piles(piles)) => {
-                    say(out, "change", &format!("piles {}", piles.join(" ")))
-                }
-                Some(change) => say(out, "change", change.word()),
-                None => say(out, "change", "none"),
+            say(out, "change", &change_said(change.as_ref()));
+            if !one.misses.is_empty() {
+                say(out, "misses", &one.misses.join(", "));
             }
         }
         let mut row = json!({
@@ -274,11 +338,13 @@ fn list(m: &ArgMatches, out: &mut Out) -> Result {
         });
         if since.is_some() {
             row["change"] = json!(change.as_ref().map(Change::word));
-            row["piles"] = json!(piles);
+            row["piles"] = json!(touched.map_or(&[][..], |t| &t.piles[..]));
+            row["touched"] = json!(touched.map_or(&[][..], |t| &t.references[..]));
+            row["misses"] = json!(one.misses);
         }
         rows.push(row);
     }
-    let touched = listed.iter().filter(|(_, c)| c.is_some()).count();
+    let touched = listed.iter().filter(|l| l.change.is_some()).count();
     if listed.is_empty() {
         putln!(out, "no pile keeps a diagram");
         out.next(
@@ -319,8 +385,8 @@ fn list(m: &ArgMatches, out: &mut Out) -> Result {
 /// it (`name`, `path` and `id`); `path`, its file; `as`; `out`, the file
 /// written, as given or chosen; `bytes`, how many were written; `width` and
 /// `height`, the diagram's size in pixels of the page; and `duration_ms`,
-/// how long a gif moves, or `null`. With --since it also has `change`, as
-/// pile diagram list gives it, and `piles`.
+/// how long a gif moves, or `null`. With --since it also has `change`,
+/// `piles` and `touched`, as pile diagram list gives them.
 fn render(m: &ArgMatches, out: &mut Out) -> Result {
     let args: Vec<&String> = m
         .get_many::<String>("diagram")
@@ -357,7 +423,7 @@ fn render(m: &ArgMatches, out: &mut Out) -> Result {
 
     let r = open()?;
     let found = r.storage().declarations(&State::Working)?;
-    let s = r.piles()?;
+    let s = piles::structure(&found)?;
     let all = diagrams::found(&found);
     let since = since_of(&r, m)?;
     let diagram = match which(&r, &s, &all, arg) {
@@ -365,12 +431,11 @@ fn render(m: &ArgMatches, out: &mut Out) -> Result {
         Err(refusal) => {
             // A diagram gone since the revision is named as gone.
             if let Some(since) = &since
-                && let Some((gone, _)) =
-                    changes_since(&r, &s, &all, since)?
-                        .into_iter()
-                        .find(|(d, c)| {
-                            *c == Some(Change::Removed) && (d.name == arg || shown(&d.path) == arg)
-                        })
+                && let Some(gone) = changes_since(&r, &s, &all, since, &Declared::of(&found, &s))?
+                    .into_iter()
+                    .filter(|l| l.change == Some(Change::Removed))
+                    .map(|l| l.diagram)
+                    .find(|d| d.name == arg || shown(&d.path) == arg)
             {
                 return Err(Refusal::new(
                     Code::NoSuchDiagram,
@@ -395,19 +460,36 @@ fn render(m: &ArgMatches, out: &mut Out) -> Result {
         .ok_or_else(|| invalid(diagram, "it is not UTF-8 text"))?;
     let read = diagram_read(diagram, source)?;
     let named = named_piles(&s);
-    let wrong = diagrams::findings(diagram, &named);
+    // The graph is built only for a diagram that says something of it, or
+    // is drawn with a change.
+    let declared =
+        (since.is_some() || diagrams::asks_graph(&read)).then(|| Declared::of(&found, &s));
+    let graph = declared.as_ref().map(Declared::graph);
+    // A diagram that misses what it should show is still drawn.
+    let wrong: Vec<_> = diagrams::findings(diagram, &named, graph)
+        .into_iter()
+        .filter(diagrams::stops_drawing)
+        .collect();
     if let Some(first) = wrong.first() {
         return Err(invalid(
             diagram,
             &format!("{} ({})", first.message, plural(wrong.len(), "problem")),
         ));
     }
-    let change = match &since {
-        Some(since) => changes_since(&r, &s, &all, since)?
-            .into_iter()
-            .find(|(d, _)| d.path == diagram.path)
-            .and_then(|(_, change)| change),
-        None => None,
+    let change = match (&since, &declared) {
+        (Some(since), Some(declared)) => {
+            let changed = changed_since(&r, &s, since, declared)?;
+            diagrams::listed(
+                &changed.then,
+                diagram,
+                &named,
+                graph,
+                &changed.piles,
+                &changed.touched,
+            )
+            .change
+        }
+        _ => None,
     };
     let failed = |why: String| {
         Refusal::new(
@@ -450,7 +532,7 @@ fn render(m: &ArgMatches, out: &mut Out) -> Result {
                 return Err(Refusal::new(
                     Code::DiagramStill,
                     format!(
-                        "{} is drawn with the piles a change touched marked, which is still, so it is not a gif",
+                        "{} is drawn with what a change touched marked, which is still, so it is not a gif",
                         shown(&diagram.path)
                     ),
                 )
@@ -462,8 +544,7 @@ fn render(m: &ArgMatches, out: &mut Out) -> Result {
                     "draws it as a picture",
                 ));
             }
-            diagrams::draw_marked(&read, |pile| marked.iter().any(|m| m == pile), as_)
-                .map_err(failed)?
+            diagrams::draw_marked(&read, marked, as_).map_err(failed)?
         }
         _ => diagrams::draw(&read, as_).map_err(failed)?,
     };
@@ -486,11 +567,7 @@ fn render(m: &ArgMatches, out: &mut Out) -> Result {
     }
     say(out, "as", as_.word());
     if since.is_some() {
-        match &change {
-            Some(Change::Piles(piles)) => say(out, "change", &format!("piles {}", piles.join(" "))),
-            Some(change) => say(out, "change", change.word()),
-            None => say(out, "change", "none"),
-        }
+        say(out, "change", &change_said(change.as_ref()));
     }
     say(
         out,
@@ -515,11 +592,10 @@ fn render(m: &ArgMatches, out: &mut Out) -> Result {
     if since.is_some()
         && let Some(result) = out.result.as_mut()
     {
+        let touched = change.as_ref().and_then(Change::touched);
         result["change"] = json!(change.as_ref().map(Change::word));
-        result["piles"] = json!(match &change {
-            Some(Change::Piles(piles)) => piles.clone(),
-            _ => Vec::new(),
-        });
+        result["piles"] = json!(touched.map_or(&[][..], |t| &t.piles[..]));
+        result["touched"] = json!(touched.map_or(&[][..], |t| &t.references[..]));
     }
     Ok(())
 }

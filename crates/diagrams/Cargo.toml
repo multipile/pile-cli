@@ -11,11 +11,16 @@ repository.workspace = true
 storage = { path = "../storage" }
 # What a pile is, and doctor's findings, which a diagram's are added to.
 piles = { path = "../piles" }
+# The nodes and the edges a repository declares, which a diagram's boxes and
+# lines stand for, and which of them differ between two states.
+graph = { path = "../graph" }
+# A Datalog program asked of the graph: what a diagram says it should show.
+query = { path = "../query" }
 # multipile's diagrams (github.com/multipile/diagrams), pinned to a commit:
 # the reader of a .diagram file and the rules it holds a diagram to; the
 # document a diagram is painted into; the page written from it; and the
 # picture takumi renders from it.
-diagram-format = { git = "https://github.com/multipile/diagrams", rev = "07d475924b007b4308e5c6a3080eee29b1e8c781" }
-diagram-document = { git = "https://github.com/multipile/diagrams", rev = "07d475924b007b4308e5c6a3080eee29b1e8c781" }
-diagram-html = { git = "https://github.com/multipile/diagrams", rev = "07d475924b007b4308e5c6a3080eee29b1e8c781" }
-diagram-render = { git = "https://github.com/multipile/diagrams", rev = "07d475924b007b4308e5c6a3080eee29b1e8c781" }
+diagram-format = { git = "https://github.com/multipile/diagrams", rev = "f3134e09c8def8110dc0f795c2dcb5bcad62432e" }
+diagram-document = { git = "https://github.com/multipile/diagrams", rev = "f3134e09c8def8110dc0f795c2dcb5bcad62432e" }
+diagram-html = { git = "https://github.com/multipile/diagrams", rev = "f3134e09c8def8110dc0f795c2dcb5bcad62432e" }
+diagram-render = { git = "https://github.com/multipile/diagrams", rev = "f3134e09c8def8110dc0f795c2dcb5bcad62432e" }

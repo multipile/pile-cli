@@ -8,13 +8,28 @@
 //! type are held to, paints it into a document, and writes the document as
 //! a page or renders it as a picture. This crate finds the files among a
 //! repository's declarations, and holds each to what only the repository
-//! can say: that every pile it names is one of the repository's piles.
+//! can say.
+//!
+//! A diagram says it in metadata, which the format keeps and never reads,
+//! under the owner `pile` ([`meta`]): which node a box stands for, which
+//! edge a line does, what the diagram should show, as Datalog programs, and
+//! what it leaves out on purpose. Held to the graph, that gives doctor's
+//! findings ([`findings`]), what a change touched of what a diagram stands
+//! for ([`changes`]), and what it should show and does not ([`misses`]).
 
+use std::collections::BTreeSet;
+
+use diagram_document::Mark;
 pub use diagram_format as format;
-use diagram_format::{Body, Item};
+use diagram_format::finding::locate;
 use piles::doctor::{Finding, Severity, Survey};
 use piles::{FROM_TOP, ROOT, SIGIL, shown};
 use storage::Content;
+
+mod checks;
+pub mod meta;
+
+pub use checks::{Draws, Graph, Standing, Stands};
 
 /// One diagram a pile keeps.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,113 +97,129 @@ pub fn named(survey: &Survey) -> Vec<Named> {
 }
 
 /// Adds what is wrong with each diagram to the survey, each finding to the
-/// row of the `.pile/` it is in.
-pub fn check(survey: &mut Survey, files: &[Content]) {
+/// row of the `.pile/` it is in. `graph` is the graph of the same files,
+/// given only when every pile's config reads: without it, a diagram is held
+/// to what its file alone shows, and to the piles it names the old way.
+pub fn check(survey: &mut Survey, files: &[Content], graph: Option<Graph>) {
     let piles = named(survey);
     let findings = found(files)
         .iter()
-        .flat_map(|d| findings(d, &piles))
+        .flat_map(|d| findings(d, &piles, graph))
         .collect();
     survey.add(findings);
 }
 
-/// What is wrong with one diagram: each rule of its format it breaks, and
-/// each pile it names that the repository does not have. Every one is a
-/// problem.
-pub fn findings(diagram: &Diagram, piles: &[Named]) -> Vec<Finding> {
+/// What is wrong with one diagram, in the order of the file: each rule of
+/// its format it breaks; each word of `pile`'s metadata that is not one;
+/// each box and line that stands for nothing; and, of what its includes
+/// say it should show, each node and edge it does not. Every one is a
+/// problem but `diagram-ignore-unneeded`, a note.
+///
+/// Without a graph, only what the file alone shows is found, and a pile
+/// named as `pile="@name"` that the repository does not have.
+pub fn findings(diagram: &Diagram, piles: &[Named], graph: Option<Graph>) -> Vec<Finding> {
+    match held(diagram, piles, graph) {
+        Ok(held) => held.findings,
+        Err(unread) => unread,
+    }
+}
+
+/// A diagram that reads, held to the repository once: its findings, in the
+/// order of the file, what it stands for, and what it misses.
+struct Held {
+    findings: Vec<Finding>,
+    standing: Standing,
+    misses: Vec<String>,
+}
+
+/// Reads one diagram and holds it to the repository. A diagram that does
+/// not read is the findings that say why.
+fn held(diagram: &Diagram, piles: &[Named], graph: Option<Graph>) -> Result<Held, Vec<Finding>> {
     let Some(source) = &diagram.source else {
-        return vec![problem(
+        return Err(vec![finding(
             "diagram-invalid",
             &diagram.path,
             None,
             "the diagram is not UTF-8 text, so it cannot be read".to_string(),
             "write it again as text: pile guide diagrams says what a diagram holds".to_string(),
-        )];
+        )]);
     };
-    let read = match diagram_format::read(source) {
-        Ok(read) => read,
-        Err(found) => {
-            return found
-                .0
-                .into_iter()
-                .map(|f| {
-                    problem(
-                        "diagram-invalid",
-                        &diagram.path,
-                        Some((f.line, f.column)),
-                        format!("{} ({})", f.message, f.code),
-                        f.help.unwrap_or_else(|| {
-                            "pile guide diagrams says what a diagram holds".to_string()
-                        }),
-                    )
-                })
-                .collect();
-        }
-    };
-    let mut out = Vec::new();
-    for item in with_piles(&read.diagram.body) {
-        let Some(pile) = &item.pile else { continue };
-        let at = Some(diagram_format::finding::locate(source, item.span.offset));
-        let by_reference = resolve(&pile.reference, piles);
-        let by_id = pile
-            .id
-            .as_deref()
-            .and_then(|id| piles.iter().find(|p| p.id == id));
-        match (by_reference, by_id, &pile.id) {
-            (Some(_), None, None) => {}
-            (Some(named), Some(with_id), _) if named.path == with_id.path => {}
-            (Some(named), Some(with_id), _) => out.push(problem(
-                "diagram-pile-id-differs",
-                &diagram.path,
-                at,
-                format!(
-                    "{} is the pile at {}, and the id given is the pile at {}",
-                    pile.reference,
-                    shown(&named.path),
-                    shown(&with_id.path)
-                ),
-                format!(
-                    "write the id of {} (pile list --full prints it), or the name of the pile the id is",
-                    pile.reference
-                ),
-            )),
-            (Some(_), None, Some(id)) => out.push(problem(
-                "diagram-pile-id-differs",
-                &diagram.path,
-                at,
-                format!("{} is a pile, and no pile has the id {id}", pile.reference),
-                "copy the pile's id from pile list --full, or leave id= out".to_string(),
-            )),
-            (None, Some(with_id), _) => out.push(problem(
-                "diagram-no-such-pile",
-                &diagram.path,
-                at,
-                format!(
-                    "no pile answers to {}, and the pile with its id is now {}",
-                    pile.reference,
-                    with_id.handle()
-                ),
-                format!("write pile=\"{}\"", with_id.handle()),
-            )),
-            (None, None, _) => {
-                let handles: Vec<String> = piles.iter().map(Named::handle).collect();
-                let near = diagram_format::finding::nearest(&pile.reference, handles.iter().map(String::as_str));
-                let fix = match near {
-                    Some(near) => format!("did you mean {near}? Write pile=\"{near}\""),
-                    None => "name one of the piles pile list prints, as @name or as its :/ path, or leave pile= out"
-                        .to_string(),
-                };
-                out.push(problem(
-                    "diagram-no-such-pile",
+    let read = diagram_format::read(source).map_err(|found| {
+        found
+            .0
+            .into_iter()
+            .map(|f| {
+                finding(
+                    "diagram-invalid",
                     &diagram.path,
-                    at,
-                    format!("no pile answers to {}", pile.reference),
-                    fix,
-                ))
-            }
-        }
+                    Some((f.line, f.column)),
+                    format!("{} ({})", f.message, f.code),
+                    f.help.unwrap_or_else(|| {
+                        "pile guide diagrams says what a diagram holds".to_string()
+                    }),
+                )
+            })
+            .collect::<Vec<_>>()
+    })?;
+    let checks::Held {
+        wrong,
+        standing,
+        misses,
+    } = checks::hold(&read.diagram, piles, graph);
+    let mut findings: Vec<Finding> = wrong
+        .into_iter()
+        .map(|w| {
+            let at = locate(source, w.offset);
+            finding(w.code, &diagram.path, Some(at), w.message, w.fix)
+        })
+        .collect();
+    findings.sort_by_key(|f| (f.line, f.column));
+    Ok(Held {
+        findings,
+        standing,
+        misses,
+    })
+}
+
+/// How a finding of each code counts: its severity, and whether it stops
+/// the diagram being drawn. A diagram that misses what it should show is
+/// still true, only incomplete, so it is drawn. One with a box or a line
+/// that stands for nothing, or any other problem, is not.
+fn counts(code: &str) -> (Severity, bool) {
+    match code {
+        "diagram-ignore-unneeded" => (Severity::Note, false),
+        "diagram-misses-node" | "diagram-misses-link" => (Severity::Problem, false),
+        _ => (Severity::Problem, true),
     }
-    out
+}
+
+/// Whether one of a diagram's findings stops the diagram being drawn.
+pub fn stops_drawing(finding: &Finding) -> bool {
+    counts(finding.code).1
+}
+
+/// What a diagram stands for: the node of each element that names one, and
+/// the edge of each line that names one. Nothing for a diagram that does
+/// not read.
+pub fn standing(diagram: &Diagram, piles: &[Named], graph: Option<Graph>) -> Standing {
+    held(diagram, piles, graph)
+        .map(|held| held.standing)
+        .unwrap_or_default()
+}
+
+/// The nodes and the edges a diagram should show and does not, each as an
+/// answer of a program writes it: `@name`, `type:name`, or an edge's
+/// source, type and target. None for a diagram that does not read.
+pub fn misses(diagram: &Diagram, piles: &[Named], graph: Graph) -> Vec<String> {
+    held(diagram, piles, Some(graph))
+        .map(|held| held.misses)
+        .unwrap_or_default()
+}
+
+/// Whether a diagram that reads says anything of the graph. One that does
+/// not has the same findings with a graph and without one.
+pub fn asks_graph(diagram: &diagram_format::Diagram) -> bool {
+    meta::read(diagram).asks_graph()
 }
 
 /// The pile a diagram's reference names: `@name` by its name, or a `:/`
@@ -202,36 +233,9 @@ pub fn resolve<'p>(reference: &str, piles: &'p [Named]) -> Option<&'p Named> {
     piles.iter().find(|p| p.path == path)
 }
 
-/// Every element of a diagram that may stand for a pile, in the order the
-/// file writes them.
-pub fn with_piles(body: &Body) -> Vec<&Item> {
-    match body {
-        Body::Architecture(a) => a
-            .boxes
-            .iter()
-            .flat_map(|held| std::iter::once(&held.item).chain(&held.holds))
-            .collect(),
-        Body::Sequence(s) => s.actors.iter().collect(),
-        Body::State(s) => s.states.iter().map(|state| &state.item).collect(),
-        Body::Swimlane(s) => s.lanes.iter().flat_map(|lane| &lane.steps).collect(),
-        Body::Process(p) => p
-            .lanes
-            .iter()
-            .flat_map(|lane| lane.tasks.iter().map(|task| &task.item))
-            .collect(),
-        Body::Tree(t) => t
-            .root
-            .walk()
-            .into_iter()
-            .map(|branch| &branch.item)
-            .collect(),
-        Body::Dependency(d) => d.boxes.iter().collect(),
-        Body::Nested(n) => n.levels.iter().collect(),
-        Body::Treemap(t) => t.parts.iter().map(|part| &part.item).collect(),
-    }
-}
-
-fn problem(
+/// One of a diagram's findings, at a line and a column of its file, or at
+/// the file alone. Its severity is its code's.
+fn finding(
     code: &'static str,
     file: &str,
     at: Option<(usize, usize)>,
@@ -240,7 +244,7 @@ fn problem(
 ) -> Finding {
     Finding {
         code,
-        severity: Severity::Problem,
+        severity: counts(code).0,
         file: file.to_string(),
         line: at.map(|(line, _)| line),
         column: at.map(|(_, column)| column),
@@ -316,15 +320,18 @@ pub fn draw_diff(
     Some(draw_documents(&still, moving.as_ref(), as_))
 }
 
-/// Draws a diagram with the boxes of the piles `marked` says a change
-/// touched marked, each pile as the file names it. It is still, so it is
-/// drawn as a page or a picture, and never as a gif.
+/// Draws a diagram with what a change touched marked: each element and
+/// each line of `touched`, by its key. It is still, so it is drawn as a
+/// page or a picture, and never as a gif.
 pub fn draw_marked(
     diagram: &diagram_format::Diagram,
-    marked: impl Fn(&str) -> bool,
+    touched: &Touched,
     as_: As,
 ) -> Result<Drawn, String> {
-    let still = diagram_document::changed_document(diagram, marked);
+    let still = diagram_document::changed_document(diagram, |mark| match mark {
+        Mark::Element(key) => touched.elements.iter().any(|e| e == key),
+        Mark::Line { from, to } => touched.lines.iter().any(|(f, t)| f == from && t == to),
+    });
     draw_documents(&still, None, as_)
 }
 
@@ -367,6 +374,29 @@ fn draw_documents(
     }
 }
 
+/// What a change touched of what a diagram stands for.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Touched {
+    /// The piles alone, each once, in the order the file names them: as
+    /// the file names it where it says `pile="@name"`, and as an answer
+    /// writes it otherwise.
+    pub piles: Vec<String>,
+    /// Every node and then every edge, each once, as an answer of a
+    /// program writes it: `@name`, `type:name`, or an edge's source, type
+    /// and target.
+    pub references: Vec<String>,
+    /// The keys of the elements that stand for a touched node.
+    pub elements: Vec<String>,
+    /// The two keys of each line that stands for a touched edge.
+    pub lines: Vec<(String, String)>,
+}
+
+impl Touched {
+    pub fn is_empty(&self) -> bool {
+        self.references.is_empty()
+    }
+}
+
 /// How a diagram changed since a revision.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Change {
@@ -374,9 +404,9 @@ pub enum Change {
     Added,
     /// Its file changed.
     Edited,
-    /// Its file did not change, and it shows piles the change touched: each
-    /// as the file names it, in the order it names them.
-    Piles(Vec<String>),
+    /// Its file did not change, and something it stands for was touched: a
+    /// pile, another node, or an edge.
+    Piles(Touched),
     /// Its file is gone.
     Removed,
 }
@@ -390,64 +420,157 @@ impl Change {
             Change::Removed => "removed",
         }
     }
+
+    /// What the change touched of what the diagram stands for, for a
+    /// diagram whose file did not change.
+    pub fn touched(&self) -> Option<&Touched> {
+        match self {
+            Change::Piles(touched) => Some(touched),
+            _ => None,
+        }
+    }
+}
+
+/// One diagram, how a change touched it, and what it should show and does
+/// not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Listed {
+    pub diagram: Diagram,
+    pub change: Option<Change>,
+    /// As [`misses`] gives them, in the working copy. Empty for a diagram
+    /// that is gone, and when there is no graph.
+    pub misses: Vec<String>,
 }
 
 /// Each diagram there is now, and each that is gone, in path order, with
 /// how it changed since a revision, or None. `then` are the diagrams at the
-/// revision, and `now` those of the working copy. `touched` says whether a
-/// pile a diagram names, as the file names it, is one the change touched.
+/// revision, and `now` those of the working copy. `piles` and `graph` are
+/// the working copy's. What the change touched is its caller's to say:
+/// `touched_piles` the ids of the piles whose files changed, and `touched`
+/// the other nodes and the edges that were added, removed or changed.
 pub fn changes(
     then: &[Diagram],
     now: &[Diagram],
-    touched: impl Fn(&str) -> bool,
-) -> Vec<(Diagram, Option<Change>)> {
-    let mut out: Vec<(Diagram, Option<Change>)> = now
+    piles: &[Named],
+    graph: Option<Graph>,
+    touched_piles: &BTreeSet<String>,
+    touched: &graph::Touched,
+) -> Vec<Listed> {
+    let mut out: Vec<Listed> = now
         .iter()
-        .map(|diagram| {
-            let before = then.iter().find(|d| d.path == diagram.path);
-            let change = match before {
-                None => Some(Change::Added),
-                Some(before) if before.source != diagram.source => Some(Change::Edited),
-                Some(_) => {
-                    let piles = shown_piles(diagram)
-                        .into_iter()
-                        .filter(|reference| touched(reference))
-                        .collect::<Vec<_>>();
-                    (!piles.is_empty()).then_some(Change::Piles(piles))
-                }
-            };
-            (diagram.clone(), change)
-        })
+        .map(|diagram| listed(then, diagram, piles, graph, touched_piles, touched))
         .collect();
     for gone in then
         .iter()
         .filter(|d| !now.iter().any(|n| n.path == d.path))
     {
-        out.push((gone.clone(), Some(Change::Removed)));
+        out.push(Listed {
+            diagram: gone.clone(),
+            change: Some(Change::Removed),
+            misses: Vec::new(),
+        });
     }
-    out.sort_by(|a, b| a.0.path.cmp(&b.0.path));
+    out.sort_by(|a, b| a.diagram.path.cmp(&b.diagram.path));
     out
 }
 
-/// The piles a diagram that reads names, each once, as the file names
-/// them, in the order it names them. None for a diagram that does not read.
-pub fn shown_piles(diagram: &Diagram) -> Vec<String> {
-    let Some(read) = diagram
-        .source
-        .as_deref()
-        .and_then(|s| diagram_format::read(s).ok())
-    else {
-        return Vec::new();
-    };
-    let mut piles: Vec<String> = Vec::new();
-    for item in with_piles(&read.diagram.body) {
-        if let Some(pile) = &item.pile
-            && !piles.contains(&pile.reference)
-        {
-            piles.push(pile.reference.clone());
+/// One diagram of the working copy, as [`changes`] lists it. The diagram is
+/// held to the repository once, for what the change touched of it and for
+/// what it misses.
+pub fn listed(
+    then: &[Diagram],
+    diagram: &Diagram,
+    piles: &[Named],
+    graph: Option<Graph>,
+    touched_piles: &BTreeSet<String>,
+    touched: &graph::Touched,
+) -> Listed {
+    let held = held(diagram, piles, graph).ok();
+    let change = match then.iter().find(|d| d.path == diagram.path) {
+        None => Some(Change::Added),
+        Some(before) if before.source != diagram.source => Some(Change::Edited),
+        Some(_) => {
+            let touched = held.as_ref().map_or_else(Touched::default, |held| {
+                touched_in(&held.standing, piles, graph, touched_piles, touched)
+            });
+            (!touched.is_empty()).then_some(Change::Piles(touched))
         }
+    };
+    Listed {
+        diagram: diagram.clone(),
+        change,
+        misses: held.map_or_else(Vec::new, |held| held.misses),
     }
-    piles
+}
+
+/// What a change touched of what one diagram stands for. Nothing for a
+/// diagram that does not read.
+pub fn touched_of(
+    diagram: &Diagram,
+    piles: &[Named],
+    graph: Option<Graph>,
+    touched_piles: &BTreeSet<String>,
+    touched: &graph::Touched,
+) -> Touched {
+    held(diagram, piles, graph).map_or_else(
+        |_| Touched::default(),
+        |held| touched_in(&held.standing, piles, graph, touched_piles, touched),
+    )
+}
+
+/// What a change touched of what a diagram stands for.
+fn touched_in(
+    standing: &Standing,
+    piles: &[Named],
+    graph: Option<Graph>,
+    touched_piles: &BTreeSet<String>,
+    touched: &graph::Touched,
+) -> Touched {
+    let mut out = Touched::default();
+    // Without a graph a diagram stands for piles alone, each named as it
+    // is typed.
+    let symbol = |node: &graph::Node| match (graph, node) {
+        (Some(g), _) => g.db.symbol(node),
+        (None, graph::Node::Pile(id)) => piles
+            .iter()
+            .find(|p| &p.id == id)
+            .map_or_else(|| id.clone(), Named::handle),
+        (None, graph::Node::Named { of_type, name }) => format!("{of_type}:{name}"),
+    };
+    let add = |list: &mut Vec<String>, said: String| {
+        if !list.contains(&said) {
+            list.push(said);
+        }
+    };
+    for element in &standing.elements {
+        let is_touched = match &element.node {
+            graph::Node::Pile(id) => touched_piles.contains(id),
+            node => touched.nodes.contains(node),
+        };
+        if !is_touched {
+            continue;
+        }
+        let said = symbol(&element.node);
+        if matches!(element.node, graph::Node::Pile(_)) {
+            add(
+                &mut out.piles,
+                element.written.clone().unwrap_or_else(|| said.clone()),
+            );
+        }
+        add(&mut out.references, said);
+        out.elements.push(element.key.clone());
+    }
+    for line in &standing.lines {
+        if !touched.edges.contains(&line.edge) {
+            continue;
+        }
+        // A line stands for an edge only when there is a graph.
+        if let Some(g) = graph {
+            add(&mut out.references, g.db.written(&line.edge));
+        }
+        out.lines.push((line.from.clone(), line.to.clone()));
+    }
+    out
 }
 
 #[cfg(test)]
