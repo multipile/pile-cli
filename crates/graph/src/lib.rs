@@ -21,11 +21,18 @@
 //! path is in, are worked out as `piles` works them out, and are not rows
 //! here.
 //!
+//! One thing is read off the rows alone, for whoever has two states of one
+//! repository: [`touched`] says which nodes and edges differ between them.
+//!
 //! Nothing here writes, and nothing here knows how a repository is stored.
+
+use std::collections::{BTreeMap, BTreeSet};
 
 use piles::config::{AUX, KEY_ID, KEY_NAME};
 use piles::doctor::{Finding, Severity, Survey, split};
-use piles::{Pile, Position, Structure, intent, is_toml, shown, structure};
+use piles::{
+    INTENT_FILE, PILE_DIR, Pile, Position, Structure, intent, is_toml, join, shown, structure,
+};
 use storage::{Content, FileKind, State, Storage};
 
 pub mod checks;
@@ -299,6 +306,26 @@ impl Relations {
         self.node.iter().find(|n| &n.node == node)
     }
 
+    /// The row of the node of a type and a name, when one is declared. A
+    /// pile is not found this way: it is found by its id.
+    pub fn named(&self, of_type: &str, name: &str) -> Option<&NodeRow> {
+        self.node.iter().find(
+            |n| matches!(&n.node, Node::Named { of_type: t, name: m } if t == of_type && m == name),
+        )
+    }
+
+    /// The pile a node is at home in. A pile is at home in itself.
+    pub fn home(&self, node: &Node) -> Option<&Node> {
+        self.node(node).map(|n| &n.home)
+    }
+
+    /// The edge of a type from one node to another, when a link declares it.
+    pub fn edge(&self, source: &Node, of_type: &str, target: &Node) -> Option<&Edge> {
+        self.edge
+            .iter()
+            .find(|e| &e.source == source && e.of_type == of_type && &e.target == target)
+    }
+
     /// The types an aux pile creates, in order.
     pub fn types_of(&self, pile: &Node) -> Vec<&TypeOf> {
         self.types.iter().filter(|t| &t.home == pile).collect()
@@ -377,10 +404,16 @@ impl Relations {
 /// `pile doctor` reports it ([`check`]).
 pub fn read(storage: &dyn Storage, at: &State) -> Result<Relations, piles::Error> {
     let found = storage.declarations(at)?;
-    let s = structure(&found)?;
-    let mut r = piles(&s);
-    r.extend(declarations(&s.ordered(), &found).relations);
-    Ok(r)
+    Ok(relations(&structure(&found)?, &found))
+}
+
+/// The rows [`read`] gives, of declaration files already read and the piles
+/// they declare: for a caller that needs the files or the piles too, and
+/// asks the storage for them once.
+pub fn relations(s: &Structure, files: &[Content]) -> Relations {
+    let mut r = piles(s);
+    r.extend(declarations(&s.ordered(), files).relations);
+    r
 }
 
 /// What the `.toml` files declare, as rows, and what is wrong with them.
@@ -480,20 +513,94 @@ pub fn declarations(piles: &[&Pile], files: &[Content]) -> Declared {
 /// `pile doctor` made of its piles, so doctor gives one report. Only the
 /// piles whose config reads are read: a pile whose config is refused has its
 /// own finding first.
-pub fn check(survey: &mut Survey, files: &[Content]) {
+///
+/// It returns the rows it built on the way: those piles, and what their
+/// `.toml` files declare that checks. When every config reads, they are the
+/// rows [`read`] gives of the same files.
+pub fn check(survey: &mut Survey, files: &[Content]) -> Relations {
+    let mut by_path: BTreeMap<&str, &Content> = BTreeMap::new();
+    for c in files {
+        by_path.entry(c.path.as_str()).or_insert(c);
+    }
     let piles: Vec<Pile> = survey
         .rows
         .iter()
         .filter_map(|r| {
+            let intent = join(&r.path, &[PILE_DIR, INTENT_FILE]);
             r.config.clone().map(|config| Pile {
                 path: r.path.clone(),
                 config,
-                intent: None,
+                intent: by_path
+                    .get(intent.as_str())
+                    .filter(|c| c.kind != FileKind::Symlink)
+                    .map(|c| String::from_utf8_lossy(&c.bytes).into_owned()),
             })
         })
         .collect();
     let refs: Vec<&Pile> = piles.iter().collect();
-    survey.add(declarations(&refs, files).findings);
+    let declared = declarations(&refs, files);
+    survey.add(declared.findings);
+    let mut r = Relations::default();
+    for pile in &refs {
+        add_pile(&mut r, pile);
+    }
+    r.extend(declared.relations);
+    r
+}
+
+/// What differs between the rows of two states of a repository.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Touched {
+    /// The nodes that are not piles. A pile is touched by its files, which
+    /// `piles::changes` says, and is never among these.
+    pub nodes: BTreeSet<Node>,
+    pub edges: BTreeSet<Edge>,
+}
+
+/// The nodes that are not piles, and the edges, that one state has and the
+/// other does not, or whose properties differ between the two: a row of
+/// `prop` or `edge_prop` in one and not in the other. Where a thing is
+/// written is never a change, so a table moved to another line, file or
+/// pile touches nothing, and `at` and `prop_at` are not read.
+pub fn touched(then: &Relations, now: &Relations) -> Touched {
+    type Said<'r> = BTreeSet<(&'r str, &'r Value)>;
+    fn nodes(r: &Relations) -> BTreeMap<&Node, Said<'_>> {
+        let mut out: BTreeMap<&Node, Said> = BTreeMap::new();
+        for n in &r.node {
+            if matches!(n.node, Node::Named { .. }) {
+                out.entry(&n.node).or_default();
+            }
+        }
+        for p in &r.prop {
+            if let Some(said) = out.get_mut(&p.node) {
+                said.insert((&p.property, &p.value));
+            }
+        }
+        out
+    }
+    fn edges(r: &Relations) -> BTreeMap<&Edge, Said<'_>> {
+        let mut out: BTreeMap<&Edge, Said> = r.edge.iter().map(|e| (e, Said::new())).collect();
+        for p in &r.edge_prop {
+            if let Some(said) = out.get_mut(&p.edge) {
+                said.insert((&p.property, &p.value));
+            }
+        }
+        out
+    }
+    fn differing<T: Ord + Clone>(
+        then: &BTreeMap<&T, Said<'_>>,
+        now: &BTreeMap<&T, Said<'_>>,
+    ) -> BTreeSet<T> {
+        then.keys()
+            .chain(now.keys())
+            .filter(|k| then.get(*k) != now.get(*k))
+            .map(|k| (*k).clone())
+            .collect()
+    }
+    Touched {
+        nodes: differing(&nodes(then), &nodes(now)),
+        edges: differing(&edges(then), &edges(now)),
+    }
 }
 
 /// The rows the piles declare: each pile a node of type [`PILE`], at its

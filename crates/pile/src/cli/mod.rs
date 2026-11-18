@@ -48,6 +48,7 @@ mod init;
 mod links;
 mod list;
 mod log;
+mod query;
 mod set;
 mod show;
 mod status;
@@ -104,6 +105,7 @@ pub fn command() -> Command {
         .subcommand(one_help(with_help(status::command())))
         .subcommand(one_help(with_help(gitdiff::command())))
         .subcommand(one_help(with_help(log::command())))
+        .subcommand(one_help(with_help(query::command())))
         .subcommand(one_help(with_help(doctor::command())))
         .subcommand(one_help(with_help(diagram::command())))
         .subcommand(one_help(with_help(guide::command())))
@@ -230,6 +232,7 @@ fn dispatch(matches: &ArgMatches, out: &mut Out, mode: Mode) -> Result {
         Some(("status", m)) => status::run(m, out),
         Some(("gitdiff", m)) => gitdiff::run(m, out),
         Some(("log", m)) => log::run(m, out),
+        Some(("query", m)) => query::run(m, out),
         Some(("doctor", m)) => doctor::run(m, out),
         Some(("diagram", m)) => diagram::run(m, out),
         Some(("guide", m)) => guide::run(m, out),

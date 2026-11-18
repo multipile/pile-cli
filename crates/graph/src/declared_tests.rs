@@ -618,3 +618,107 @@ fn a_value_is_kept_as_it_is_written_and_a_list_gives_each_item_once() {
     );
     assert_eq!(r.values(&pile(API), "labels").len(), 2);
 }
+
+const USES_API: &str = "[[edges]]\ntype = \"uses\"\ntarget = \"@api\"\ntitle = \"calls\"\n";
+const GIT: &str = "[[nodes]]\ntype = \"external\"\nname = \"git\"\ntitle = \"the git binary\"\n";
+
+fn rows(files: &[(&str, &str)]) -> Relations {
+    read(&repository(files), &State::Working).unwrap()
+}
+
+#[test]
+fn a_link_and_a_node_moved_to_another_file_or_pile_are_not_touched() {
+    let then = rows(&[
+        ("/app/.pile/links.toml", &format!("{V}{USES_API}")),
+        ("/app/.pile/nodes.toml", &format!("{V}{GIT}")),
+    ]);
+    // The link goes to another file, under a comment, with both ends
+    // written, and the node goes to another pile.
+    let now = rows(&[
+        (
+            "/api/.pile/more.toml",
+            &format!("{V}# moved\n\n{USES_API}source = \"@app\"\n"),
+        ),
+        ("/.pile/nodes.toml", &format!("{V}{GIT}")),
+    ]);
+    assert_ne!(then.at, now.at);
+    assert_ne!(then.node, now.node);
+    assert_eq!(touched(&then, &now), Touched::default());
+    assert_eq!(touched(&then, &now), Touched::default());
+}
+
+#[test]
+fn a_link_or_a_node_whose_property_differs_is_touched() {
+    let files = |link: &str, node: &str| {
+        rows(&[
+            ("/app/.pile/links.toml", &format!("{V}{link}")),
+            ("/app/.pile/nodes.toml", &format!("{V}{node}")),
+        ])
+    };
+    let then = files(USES_API, GIT);
+    let uses = edge(pile(APP), "uses", pile(API));
+    let git = named("external", "git");
+
+    let t = touched(&then, &files(&USES_API.replace("calls", "reads"), GIT));
+    assert_eq!(t.edges, BTreeSet::from([uses.clone()]));
+    assert!(t.nodes.is_empty());
+
+    // A key of its own is a property like any other, and so is one item of
+    // a list.
+    let t = touched(&then, &files(USES_API, &format!("{GIT}tags = [\"vcs\"]\n")));
+    assert_eq!(t.nodes, BTreeSet::from([git.clone()]));
+    assert!(t.edges.is_empty());
+
+    // A title taken away is a row gone.
+    let t = touched(
+        &then,
+        &files(&USES_API.replace("title = \"calls\"\n", ""), GIT),
+    );
+    assert_eq!(t.edges, BTreeSet::from([uses]));
+}
+
+#[test]
+fn a_link_or_a_node_added_or_removed_is_touched_and_a_pile_never_is() {
+    let then = rows(&[]);
+    let now = rows(&[
+        ("/app/.pile/links.toml", &format!("{V}{USES_API}")),
+        ("/app/.pile/nodes.toml", &format!("{V}{GIT}")),
+        (
+            "/app/.pile/pile.toml",
+            &format!("{V}[pile]\nlabels = [\"ui\"]\n"),
+        ),
+    ]);
+    let added = Touched {
+        nodes: BTreeSet::from([named("external", "git")]),
+        edges: BTreeSet::from([edge(pile(APP), "uses", pile(API))]),
+    };
+    assert_eq!(touched(&then, &now), added);
+    assert_eq!(touched(&now, &then), added);
+}
+
+#[test]
+fn a_node_is_at_home_in_the_pile_that_declares_it_and_a_pile_in_itself() {
+    let m = repository(&[("/app/.pile/nodes.toml", &format!("{V}{GIT}"))]);
+    let r = read(&m, &State::Working).unwrap();
+    assert_eq!(r.home(&named("external", "git")), Some(&pile(APP)));
+    assert_eq!(r.home(&pile(API)), Some(&pile(API)));
+    assert_eq!(
+        r.named("external", "git").map(|n| &n.node),
+        Some(&named("external", "git"))
+    );
+    assert_eq!(r.named("pile", "app"), None);
+}
+
+#[test]
+fn doctor_s_check_returns_the_rows_a_read_gives() {
+    let m = repository(&[
+        ("/app/.pile/links.toml", &format!("{V}{USES_API}")),
+        ("/app/.pile/nodes.toml", &format!("{V}{GIT}")),
+    ]);
+    let found = m.declarations(&State::Working).unwrap();
+    let mut survey = piles::doctor::survey_of(&m, &found).unwrap();
+    let r = check(&mut survey, &found);
+    assert_eq!(r, read(&m, &State::Working).unwrap());
+    assert!(r.edge(&pile(APP), "uses", &pile(API)).is_some());
+    assert!(r.edge(&pile(API), "uses", &pile(APP)).is_none());
+}

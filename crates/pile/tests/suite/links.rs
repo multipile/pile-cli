@@ -35,7 +35,7 @@ const V: &str = "version = \"gitpile/1\"\n";
 /// `external`, `uses` and `exercises`. The top declares `external:git`.
 /// @cli uses @storage and external:git, and @journeys exercises @cli.
 /// Committed.
-fn linked() -> Repo {
+pub(crate) fn linked() -> Repo {
     let r = Repo::new();
     r.declare(".", "a", "top");
     r.intent(".", "The whole repository.\n");

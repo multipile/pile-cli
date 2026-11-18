@@ -2,7 +2,7 @@
 role = start
 summary = where a session begins, and how to read the rest of the guide
 needs = piles paths
-see = adopt refine start-a-change write-an-intent commit-a-change read-a-change review reading intent boundaries leaves relies-on boundary-note reshaping doctor quality declarations types aux links diagrams answers agent-mode
+see = adopt refine start-a-change write-an-intent commit-a-change read-a-change review reading intent boundaries leaves relies-on boundary-note reshaping doctor quality declarations types aux links diagrams query answers agent-mode
 +++
 This is `pile guide`: pages of prose that the `pile` binary carries, about
 the binary that printed them. Read this page and the two printed under it
@@ -66,6 +66,7 @@ Print it, and follow it in order. Do not carry one out from memory.
 - `pile guide aux`: before you make an aux pile, or change one.
 - `pile guide links`: before you write a link, or follow one.
 - `pile guide diagrams`: before you write a diagram, or draw one.
+- `pile guide query`: when you ask a question of what the piles declare.
 - `pile guide answers`: the envelope, exit codes and refusal codes.
 - `pile guide agent-mode`: what changes when an agent runs `pile`.
 

@@ -132,11 +132,16 @@ codes! {
     /// A diagram that reads could not be drawn. The message says why.
     DrawFailed = "draw-failed", FAILURE;
     /// `diagram render --since` was asked for a gif of a diagram drawn with
-    /// the piles a change touched marked, which is still.
+    /// what a change touched marked, which is still.
     DiagramStill = "diagram-still", USAGE;
     /// `diagram render --since` could not draw an edited diagram's two
     /// versions as one: the earlier one does not read, or is of another type.
     DiagramNotComparable = "diagram-not-comparable", FAILURE;
+    /// `query` was given a program the parser or the evaluator refuses. The
+    /// message says at which line and column, and why.
+    ProgramRefused = "program-refused", FAILURE;
+    /// `query --file` was given a file that cannot be read.
+    UnreadableProgram = "unreadable-program", USAGE;
     /// A refusal that has no code of its own yet. Every refusal `pile` means
     /// to give has one, so this one is worth reporting.
     Failed = "failed", FAILURE;

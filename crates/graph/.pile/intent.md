@@ -4,10 +4,11 @@ is written.
 
 What belongs here is everything that turns declarations into those rows:
 the types the aux piles create, which node a link's reference names, and
-the line and column a reader found each one at. A reader of each
-declaration file belongs here, and so do the checks, which hold everything
-a reader found to the format before it is a row, and give doctor a finding
-for each thing that does not check.
+the line and column a reader found each one at. Which nodes and edges
+differ between the rows of two states belongs here too, since it is read
+off the rows alone. A reader of each declaration file belongs here, and so
+do the checks, which hold everything a reader found to the format before
+it is a row, and give doctor a finding for each thing that does not check.
 What makes a subtree a pile, which pile a path is in and which pile holds
 which do not belong here: the rows are read off them as they are found.
 Neither does how a repository is read, how a query is evaluated over the
