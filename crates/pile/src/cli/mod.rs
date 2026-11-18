@@ -349,6 +349,34 @@ fn open() -> Result<Repository> {
     Repository::open(&here)
 }
 
+/// What a state of the repository declares, as a diagram is held to it and
+/// a program is asked of it: the graph's rows, and the database made of
+/// them.
+struct Declared {
+    rows: graph::Relations,
+    db: ::query::Database,
+}
+
+impl Declared {
+    /// Of declaration files already read, and the piles they declare.
+    fn of(found: &[storage::Content], s: &piles::Structure) -> Declared {
+        Declared::of_rows(graph::relations(s, found), s)
+    }
+
+    /// Of rows already built, and the piles they are the rows of.
+    fn of_rows(rows: graph::Relations, s: &piles::Structure) -> Declared {
+        let db = ::query::database(&rows, s);
+        Declared { rows, db }
+    }
+
+    fn graph(&self) -> diagrams::Graph<'_> {
+        diagrams::Graph {
+            rows: &self.rows,
+            db: &self.db,
+        }
+    }
+}
+
 /// A name as a result spells it: without its @, and `null` for none.
 fn name_of(name: &str) -> Value {
     if name.is_empty() {

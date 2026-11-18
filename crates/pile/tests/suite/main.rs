@@ -14,6 +14,7 @@ mod aux;
 mod completion;
 mod declare;
 mod diagram;
+mod diagram_graph;
 mod doctor;
 mod files;
 mod gitdiff;

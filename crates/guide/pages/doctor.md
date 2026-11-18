@@ -1,7 +1,7 @@
 +++
 role = reference
 summary = what doctor's findings and severities mean, and when it must exit 0
-see = commit-a-change answers intent piles declarations diagrams
+see = commit-a-change answers intent piles declarations diagrams diagram-includes
 +++
 `pile doctor` says what every pile is, and what is wrong with any of them.
 It is the one command with a verdict: it exits 1 when it finds a problem.
@@ -49,6 +49,20 @@ row holds its findings under `problems`, `warnings` and `notes`.
   as a pile with no name. doctor still exits 0.
 - A **note** is something to know, and breaks nothing, such as a pile
   whose config is not committed yet. doctor still exits 0.
+
+## A diagram is held to what the piles declare
+
+A diagram says which node each box stands for, which link each line
+does, and what it should show (`pile guide diagrams`,
+`pile guide diagram-includes`). doctor holds each to the graph the piles
+declare. Every such finding is a problem but `diagram-ignore-unneeded`,
+a note. So a diagram that should show a pile and does not fails doctor
+until the pile is drawn, or ignored with a reason: that is how a new
+pile reaches the diagrams it belongs in.
+
+While any pile's config does not read, the graph is not whole. doctor
+then reports the config, and of each diagram only what its file alone
+shows. Fix the config first.
 
 ## Work through a report
 
