@@ -1,7 +1,7 @@
 +++
 role = reference
 summary = what a link is, where it is written, and how it names its ends
-see = declarations types aux piles doctor reading boundaries intent
+see = declarations types aux piles doctor reading boundaries relies-on intent
 +++
 A link says what one node is to another. Most often one end is a pile,
 and the other is a pile it calls, a pile that runs it, or something
@@ -90,7 +90,7 @@ A link's title says what one end relies on of the other. It names the
 node at the other end, never a file or a path. When that end is a pile,
 the title may name a part its intent claims. A title that has to name a
 part is a sign the boundary is in the wrong place
-(`pile guide boundaries`). A change that makes a title untrue is owed at
+(`pile guide relies-on`). A change that makes a title untrue is owed at
 both ends: read the pile at the other end, and rewrite the title in the
 same commit. A link added, changed or removed can also make a sentence of
 either pile's intent untrue (`pile guide intent`).

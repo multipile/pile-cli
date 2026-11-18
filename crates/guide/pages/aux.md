@@ -23,8 +23,8 @@ intent: say what words the aux pile gives the repository, and why.
 
 An aux pile creates a type with a `[[node-types]]` or `[[edge-types]]`
 table in any `.toml` file in its `.pile/`, by convention `types.toml`
-(`pile guide types`). It may not create `pile`, or write a type another
-aux pile created.
+(`pile guide types`). It may not create `pile`, or write or change a
+type another aux pile created.
 
 No table declares the keys a node, a link or `[pile]` carries of its own
 (`pile guide declarations`). When the repository agrees on what one

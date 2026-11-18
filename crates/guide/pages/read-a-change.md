@@ -2,7 +2,7 @@
 role = workflow
 summary = read what a change touched, pile by pile, against each intent
 needs = reading
-see = review commit-a-change write-an-intent links
+see = review commit-a-change write-an-intent links boundary-note
 +++
 ## When to use
 
@@ -40,7 +40,8 @@ pile log -n 10 <pile>
 
 Look for the commits of the change, each with the other piles it changed
 under `also`. `intent written here` marks a commit that rewrote the
-pile's intent. The count at the end says which piles change together.
+pile's intent. The count at the end says which piles change together. A
+commit that touched many piles is one to read part by part.
 
 ### 3. Read each changed pile's intent
 
@@ -89,5 +90,6 @@ Look for its exit code, and for findings in the piles the change touched.
 For each pile the change touched: what changed, the sentence it is held
 to, and whether the intent is still true. Then each link the change
 touched, and what it owes the pile at the other end. Then the paths in no
-pile, the paths that crossed a boundary, and what doctor reported. Change
-nothing.
+pile, the paths that crossed a boundary, and what doctor reported. Any
+boundary that looks untrue is handed back as a boundary note
+(`pile guide boundary-note`). Change nothing.

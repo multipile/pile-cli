@@ -2,7 +2,7 @@
 role = workflow
 summary = write a pile's intent, or rewrite one that is no longer true
 needs = intent
-see = commit-a-change boundaries links
+see = commit-a-change boundaries boundary-note links
 +++
 ## When to use
 
@@ -94,4 +94,4 @@ change it as they say.
 
 The intent, approved, uncommitted unless you were asked to commit it. The
 sentences the person changed, and any question about the boundary itself
-that came up (`pile guide boundaries`).
+that came up, as a boundary note (`pile guide boundary-note`).

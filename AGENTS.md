@@ -52,15 +52,14 @@ running `pile init` in its directory, and name it with `pile set name`.
   Change it when…".
 - Read a pile's intent before you change it, and keep the intent true in the
   same commit.
-- The skill that teaches piles to an agent with no `pile` binary lives in
-  the plugin repository,
+- The skills that send an agent to `pile` live in the plugin repository,
   [multipile/multipile-agent-plugins](https://github.com/multipile/multipile-agent-plugins),
-  in `plugins/gitrepo/skills/multipile`, and not
-  here. It names no `pile` command, and nothing checks it against the
-  binary. Its `reference/` pages describe the same format the binary reads.
-  So a change to what a config, an intent or a declaration file is, or to a
-  rule doctor holds piles to, changes the skill too, in a commit there that
-  goes with the one here.
+  in `plugins/gitrepo/skills`, and not here. They hold no workflow and no
+  reference page of their own: each says when it applies, and names the
+  `pile guide` page to print and the commands to run. Nothing checks them
+  against the binary. So a page that is renamed or removed, or a command
+  a skill names that changes, changes the skill too, in a commit there
+  that goes with the one here.
 
 ### Tests
 

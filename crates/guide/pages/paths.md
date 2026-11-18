@@ -1,7 +1,7 @@
 +++
 role = reference
 summary = the three forms a pile or a path is typed in, and how pile prints one
-see = piles reading
+see = piles reading leaves
 +++
 A command that takes a pile or a path reads each word as exactly one of
 three forms. It never reads a word as another form because of what the
@@ -52,3 +52,19 @@ commands with it.
 
 A file that does not exist yet is asked about as readily as one that does:
 `pile which :/src/new.rs` says which pile it would be in.
+
+## Write a pile so that it reads one way
+
+When you write about a pile, to a person or in a file, name it so that it
+can be read only one way: `@lib` for the pile, `:/packages/lib` for a
+path. Never guess which pile a word meant. If a name or a path names no
+pile, say so.
+
+## The name test
+
+If people say "the X", and X picks out one subtree and nothing else, X is
+that subtree's name, and the subtree is likely a pile
+(`pile guide leaves`). Choose a name that can be said aloud, such as
+`billing` or `design`. A pile inside another may take its parent's word
+as a prefix, such as `design-malleability` inside `design`, when the bare
+word would be ambiguous.
