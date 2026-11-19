@@ -170,4 +170,5 @@ fn a_change_is_drawn_as_a_diff_and_touched_piles_as_marks() {
     );
 }
 
+mod cases;
 mod held;

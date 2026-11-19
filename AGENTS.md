@@ -15,8 +15,9 @@ This repository builds `pile`, the binary of multipile.
 
 `pile guide commit-a-change` says what holds before any commit. Here, also:
 
-- Run the whole check: `nix develop -c scripts/check`. It must pass. It builds
-  `bin/pile`, checks the formatting, runs clippy, every test and every
+- Run the whole check: `nix develop -c scripts/check`. It must pass. It holds
+  the two pins of multipile's diagrams to one commit, builds `bin/pile`,
+  checks the formatting, runs clippy, every test and every
   journey, builds every platform a release is built for, and runs
   `pile doctor` on this repository's piles.
 - `pile doctor` must exit 0. Run it on its own while you work: it says
@@ -35,6 +36,19 @@ A dependency the code needs is a Cargo dependency. One that is not on
 crates.io is a `git` dependency pinned to a commit with `rev`. A tool a
 script needs is added to the shell's `packages` in `flake.nix`, and
 `nix flake lock --update-input <input>` moves what an input pins.
+
+multipile's diagrams are pinned in two places, to one commit:
+`crates/diagrams/Cargo.toml` pins the four `diagram-*` crates with `rev`,
+and `flake.lock` pins the flake input `diagrams`, whose cases the tests
+run. Move both together, and commit `Cargo.lock` and `flake.lock` with the
+manifest. `scripts/pins`, which the check runs first, fails when they
+differ.
+
+```sh
+# write the commit as the rev of each diagram-* crate, then
+cargo update -p diagram-format -p diagram-document -p diagram-html -p diagram-render
+nix flake lock --override-input diagrams github:multipile/diagrams/<commit>
+```
 
 ### The piles
 
@@ -73,6 +87,13 @@ session told as a bash script, and the check runs every one. Run them with
 `nix develop -c journeys/run`, watch one with `SHOW=1`, and record one with
 `nix develop -c journeys/record <journey>`. `journeys/README.md` says how to
 write one.
+
+The tests of `crates/diagrams` run every case of multipile's diagrams: each
+diagram that must read and draw, each file that must be refused, and each
+pair to compare. The flake builds the cases at the pinned commit and says
+where they are in `DIAGRAM_CASES`, in its shell and in its own checks. So
+run the tests in the shell, with `nix develop -c cargo test`: outside it
+those tests fail, and say so.
 
 The guide's pages describe the commands. A change to a command is done
 only once every page that names it has been read again, and changed where

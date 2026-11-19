@@ -1,0 +1,16 @@
+#!/bin/sh
+# Fail when multipile's diagrams are pinned to two commits. They are pinned
+# twice: crates/diagrams/Cargo.toml pins the crates the code is built with,
+# and flake.lock pins the flake whose cases the tests run. The cases of one
+# commit say nothing of the code of another, so the two must be one commit.
+# Run it from the root, in the flake's shell. scripts/check runs it.
+set -eu
+crates=$(sed -n 's/^diagram-[a-z]* = .*rev = "\([^"]*\)".*/\1/p' crates/diagrams/Cargo.toml | sort -u)
+flake=$(jq -r '.nodes.diagrams.locked.rev' flake.lock)
+if [ "$crates" != "$flake" ]; then
+  echo "multipile's diagrams are pinned to more than one commit:" >&2
+  echo "$crates" | sed 's|$|  the crates, in crates/diagrams/Cargo.toml|' >&2
+  echo "$flake  the cases, in flake.lock" >&2
+  echo "pin both to one commit: AGENTS.md says how, under The toolchain" >&2
+  exit 1
+fi
