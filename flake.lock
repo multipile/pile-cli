@@ -28,11 +28,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795113249,
+        "lastModified": 1795116535,
         "narHash": "sha256-2uV4kbr8GNm/U6B8NANlYL8xnDhvIoFK3THBjmXiuC4=",
         "owner": "multipile",
         "repo": "diagrams",
-        "rev": "9d9d1b315b133c678a49963d8aaf66a2f760b1cd",
+        "rev": "e8c87e5021bd194c268169fdbe1920515b449b3e",
         "type": "github"
       },
       "original": {
