@@ -20,7 +20,7 @@ query = { path = "../query" }
 # the reader of a .diagram file and the rules it holds a diagram to; the
 # document a diagram is painted into; the page written from it; and the
 # picture takumi renders from it.
-diagram-format = { git = "https://github.com/multipile/diagrams", rev = "c967c4ee149a75e8618f509b416976c9e2b7220d" }
-diagram-document = { git = "https://github.com/multipile/diagrams", rev = "c967c4ee149a75e8618f509b416976c9e2b7220d" }
-diagram-html = { git = "https://github.com/multipile/diagrams", rev = "c967c4ee149a75e8618f509b416976c9e2b7220d" }
-diagram-render = { git = "https://github.com/multipile/diagrams", rev = "c967c4ee149a75e8618f509b416976c9e2b7220d" }
+diagram-format = { git = "https://github.com/multipile/diagrams", rev = "3e52cb696e1530c4c60a25e0f3e0261c6d0667be" }
+diagram-document = { git = "https://github.com/multipile/diagrams", rev = "3e52cb696e1530c4c60a25e0f3e0261c6d0667be" }
+diagram-html = { git = "https://github.com/multipile/diagrams", rev = "3e52cb696e1530c4c60a25e0f3e0261c6d0667be" }
+diagram-render = { git = "https://github.com/multipile/diagrams", rev = "3e52cb696e1530c4c60a25e0f3e0261c6d0667be" }
