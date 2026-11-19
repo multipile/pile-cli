@@ -115,16 +115,16 @@ field .error.code diagram-still "and it is still, so it is not a gif"
 
 say "IV. an edited diagram marks what stands for another node, and not what is only written differently"
 
-write .pile/diagrams/layers.diagram 'diagram dependency version=1 {
-  title "What the application is built on"
-  desc "The application depends on its library."
-  box app pile="@app"
-  box lib pile="@lib"
+write .pile/diagrams/layers.diagram "diagram dependency version=1 {
+  title \"What the application is built on\"
+  desc \"The application depends on its library.\"
+  box app pile:id=\"$app\" pile:name=\"app\"
+  box lib pile:id=\"$lib\" pile:name=\"lib\"
   line app lib
 }
-'
+"
 pp diagram render --since main... layers
-field .result.change edited "the diagram now names its piles the old way, and its line stands for nothing"
+field .result.change edited "the diagram now writes each pile's name beside its id, and its line stands for nothing"
 same "$(grep -c 'data-changed="0"' layers.html)" 1 "each box stands for the pile it stood for, so nothing is marked"
 write .pile/diagrams/layers.diagram "diagram dependency version=1 {
   title \"What the application is built on\"

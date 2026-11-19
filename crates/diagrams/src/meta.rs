@@ -5,9 +5,7 @@
 //! owner:
 //!
 //! - on an element, `pile:id`, with `pile:node-type` and `pile:name` beside
-//!   it, which say the node the element stands for. A file written before
-//!   metadata gave `pile="@name"` and `id=`, which the format hands on as
-//!   `pile:ref` and `pile:id`.
+//!   it, which say the node the element stands for.
 //! - on a line, `pile:edge`, the type of the edge the line stands for.
 //! - in `meta pile`, `boxes` and `lines`, each holding `include`, a Datalog
 //!   program that says what the diagram should show, and `ignore`, one node
@@ -22,10 +20,8 @@ use diagram_format::{Body, Diagram, Item, Kind, Line, Meta, MetaNode, MetaValue,
 /// Whose metadata this crate reads.
 pub const OWNER: &str = "pile";
 
-/// The keys an element takes, and the one the format writes for an old
-/// file's `pile=`.
+/// The keys an element takes.
 const ON_ELEMENT: [&str; 3] = ["id", "node-type", "name"];
-const REF: &str = "ref";
 /// The key a line takes.
 const ON_LINE: [&str; 1] = ["edge"];
 /// What `meta pile` holds, and what each of those holds.
@@ -61,20 +57,6 @@ impl Wrong {
     }
 }
 
-/// How an element says which node it stands for.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Names {
-    /// As a file written before metadata does: a pile by `@name` or by its
-    /// `:/` path, and the id it gave beside it.
-    Reference {
-        reference: String,
-        id: Option<String>,
-    },
-    /// By the id of a pile: that pile, when there is no node type, and
-    /// otherwise the node of that type and this name at home in it.
-    Id(NamedAs),
-}
-
 /// A node as a box names one: its name, the id of the pile it is, or is at
 /// home in, and its type when it is not a pile.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,11 +68,13 @@ pub struct NamedAs {
     pub offset: usize,
 }
 
-/// One element, and what it says it stands for.
+/// One element, and the node it says it stands for: by the id of a pile,
+/// that pile when there is no node type, and otherwise the node of that
+/// type and this name at home in it.
 #[derive(Debug, Clone)]
 pub struct Element<'d> {
     pub item: &'d Item,
-    pub names: Option<Names>,
+    pub names: Option<NamedAs>,
     /// It says it stands for a node, in a way that names none: the finding
     /// is already made.
     pub broken: bool,
@@ -220,13 +204,10 @@ pub struct Said<'d> {
 }
 
 impl Said<'_> {
-    /// Whether anything said can only be held to the graph: a node named
-    /// by an id, an edge, an include or an ignore. A pile named as a file
-    /// written before metadata names one is found among the piles alone.
+    /// Whether anything said is held to the graph: a node named by an id,
+    /// an edge, an include or an ignore.
     pub fn asks_graph(&self) -> bool {
-        self.elements
-            .iter()
-            .any(|e| matches!(e.names, Some(Names::Id(_))))
+        self.elements.iter().any(|e| e.names.is_some())
             || self.wires.iter().any(|w| w.edge.is_some())
             || !self.box_includes.is_empty()
             || !self.box_ignores.is_empty()
@@ -346,11 +327,10 @@ fn mine<'m>(meta: &'m [Meta], wrong: &mut Vec<Wrong>) -> Vec<(&'m Meta, &'m str)
 }
 
 fn element<'d>(item: &'d Item, word: &str, wrong: &mut Vec<Wrong>) -> Element<'d> {
-    let (mut reference, mut id, mut node_type, mut name) = (None, None, None, None);
+    let (mut id, mut node_type, mut name) = (None, None, None);
     let mut broken = false;
     for (m, value) in mine(&item.meta, wrong) {
         match m.key.as_str() {
-            REF => reference = Some(value),
             "id" => id = Some(value),
             "node-type" => node_type = Some((m, value)),
             "name" => name = Some((m, value)),
@@ -373,28 +353,6 @@ fn element<'d>(item: &'d Item, word: &str, wrong: &mut Vec<Wrong>) -> Element<'d
                 },
             )),
         }
-    }
-    if let Some(reference) = reference {
-        // A file written before metadata: its pile is found as it was.
-        for (m, _) in [node_type, name].into_iter().flatten() {
-            wrong.push(unknown(
-                m.span.offset,
-                format!(
-                    "pile:{} is not taken beside pile=, which names the pile on its own",
-                    m.key
-                ),
-                "leave out pile= and id=, and write pile:id with the pile's id".to_string(),
-            ));
-            broken = true;
-        }
-        return Element {
-            item,
-            names: Some(Names::Reference {
-                reference: reference.to_string(),
-                id: id.map(str::to_string),
-            }),
-            broken,
-        };
     }
     if let Some((m, PILE)) = node_type {
         wrong.push(unknown(
@@ -433,12 +391,12 @@ fn element<'d>(item: &'d Item, word: &str, wrong: &mut Vec<Wrong>) -> Element<'d
     };
     Element {
         item,
-        names: Some(Names::Id(NamedAs {
+        names: Some(NamedAs {
             name: name.map_or(item.name.as_str(), |(_, n)| n).to_string(),
             id: id.to_string(),
             node_type: node_type.map(|(_, t)| t.to_string()),
             offset: item.span.offset,
-        })),
+        }),
         broken,
     }
 }

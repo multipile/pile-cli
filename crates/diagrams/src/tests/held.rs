@@ -94,11 +94,10 @@ fn repository() -> Memory {
     m
 }
 
-/// The graph of a repository, and the piles a diagram may name.
+/// The graph of a repository.
 struct Built {
     rows: Relations,
     db: Database,
-    piles: Vec<Named>,
 }
 
 impl Built {
@@ -107,16 +106,7 @@ impl Built {
         let s = piles::structure(&found).unwrap();
         let rows = graph::read(m, &State::Working).unwrap();
         let db = query::database(&rows, &s);
-        let piles = s
-            .ordered()
-            .into_iter()
-            .map(|p| Named {
-                path: p.path.clone(),
-                name: p.name.clone(),
-                id: p.id.clone(),
-            })
-            .collect();
-        Built { rows, db, piles }
+        Built { rows, db }
     }
 
     fn graph(&self) -> Graph<'_> {
@@ -155,7 +145,7 @@ fn boxes() -> String {
 /// What is wrong with a diagram of the repository, held to its graph.
 fn held(source: &str) -> Vec<Finding> {
     let built = Built::of(&repository());
-    findings(&diagram(source), &built.piles, Some(built.graph()))
+    findings(&diagram(source), Some(built.graph()))
 }
 
 fn codes(findings: &[Finding]) -> Vec<&'static str> {
@@ -261,9 +251,8 @@ fn a_type_or_a_name_with_no_id_is_a_problem() {
         assert_eq!(codes(&found), vec!["diagram-needs-id"], "{written}");
         assert_eq!(place(&found[0]), at(&source, at_));
         // The file alone shows it.
-        let built = Built::of(&repository());
         assert_eq!(
-            codes(&findings(&diagram(&source), &built.piles, None)),
+            codes(&findings(&diagram(&source), None)),
             vec!["diagram-needs-id"]
         );
     }
@@ -324,17 +313,6 @@ fn an_edge_on_a_line_with_a_box_that_stands_for_no_node_is_a_problem() {
 }
 
 #[test]
-fn a_box_named_the_old_way_is_an_end_of_an_edge_like_any_other() {
-    let source = dependency(
-        "  box web pile=\"@web\"\n  box billing pile=\":/billing\"\n  line web billing \
-         pile:edge=\"relies-on\"\n  meta pile {\n    boxes {\n      include #\"?- edge(_, Node, \
-         \"relies-on\", @billing).\"#\n      ignore \"orders\" \
-         id=\"55555555555555555555555555555555\" reason=\"not yet\"\n    }\n  }",
-    );
-    assert_eq!(held(&source), vec![]);
-}
-
-#[test]
 fn a_word_pile_does_not_read_is_a_problem_that_says_the_nearest() {
     let unknown = |body: &str, at_: &str, fix: &str| {
         let source = dependency(body);
@@ -343,9 +321,8 @@ fn a_word_pile_does_not_read_is_a_problem_that_says_the_nearest() {
         assert_eq!(place(&found[0]), at(&source, at_), "{body}");
         assert!(found[0].fix.contains(fix), "{body}: {:?}", found[0]);
         // The file alone shows it.
-        let built = Built::of(&repository());
         assert_eq!(
-            codes(&findings(&diagram(&source), &built.piles, None)),
+            codes(&findings(&diagram(&source), None)),
             vec!["diagram-meta-unknown"]
         );
     };
@@ -592,10 +569,7 @@ fn a_node_the_diagram_should_show_and_no_box_draws_is_a_problem_at_the_include()
         found[0]
     );
     let built = Built::of(&repository());
-    assert_eq!(
-        misses(&diagram(&source), &built.piles, built.graph()),
-        vec!["@orders"]
-    );
+    assert_eq!(misses(&diagram(&source), built.graph()), vec!["@orders"]);
     assert!(
         !stops_drawing(&found[0]),
         "a diagram that misses a node is still true"
@@ -609,7 +583,7 @@ fn a_node_the_diagram_should_show_and_no_box_draws_is_a_problem_at_the_include()
         &format!("      ignore \"orders\" id=\"{ORDERS}\" reason=\"moves out next quarter\"\n"),
     );
     assert_eq!(held(&ignored), vec![]);
-    assert!(misses(&diagram(&ignored), &built.piles, built.graph()).is_empty());
+    assert!(misses(&diagram(&ignored), built.graph()).is_empty());
 
     // A node that is not a pile is missed and ignored the same way.
     let source = dependency(&format!(
@@ -668,7 +642,7 @@ fn a_link_between_two_drawn_nodes_that_no_line_draws_is_a_problem_at_the_include
     );
     let built = Built::of(&repository());
     assert_eq!(
-        misses(&diagram(&source), &built.piles, built.graph()),
+        misses(&diagram(&source), built.graph()),
         vec!["@orders relies-on @billing"]
     );
     assert!(!stops_drawing(&found[0]));
@@ -784,25 +758,20 @@ fn an_ignore_says_why_and_one_the_diagram_does_not_need_is_a_note() {
 
 #[test]
 fn without_a_graph_only_what_the_file_alone_shows_is_found() {
-    // An id no pile has, a link nothing declares, a program that is
-    // refused, and a pile named the old way that is not one.
+    // An id no pile has, a link nothing declares, and a program that is
+    // refused.
     let source = dependency(&format!(
-        "  box web pile:id=\"{NOBODY}\"\n  box billing pile:id=\"{BILLING}\"\n  box gone \
-         pile=\"@gone\"\n  line billing web pile:edge=\"relies-on\"\n  meta pile {{\n    boxes \
+        "  box web pile:id=\"{NOBODY}\"\n  box billing pile:id=\"{BILLING}\"\n  line billing web pile:edge=\"relies-on\"\n  meta pile {{\n    boxes \
          {{\n      include \"?- nothing(Node).\"\n      ignore \"orders\" id=\"{ORDERS}\"\n    \
          }}\n  }}"
     ));
     let built = Built::of(&repository());
     assert_eq!(
-        codes(&findings(&diagram(&source), &built.piles, None)),
-        vec!["diagram-no-such-pile", "diagram-ignore-no-reason"],
-        "the pile named the old way, and the ignore with no reason"
+        codes(&findings(&diagram(&source), None)),
+        vec!["diagram-ignore-no-reason"],
+        "the ignore with no reason"
     );
-    let with = codes(&findings(
-        &diagram(&source),
-        &built.piles,
-        Some(built.graph()),
-    ));
+    let with = codes(&findings(&diagram(&source), Some(built.graph())));
     assert!(
         with.contains(&"diagram-include-invalid") && with.len() > 3,
         "{with:?}"
@@ -848,7 +817,7 @@ fn a_change_touches_each_node_and_edge_a_diagram_stands_for() {
     );
     let now = Built::of(&m);
     let changed = graph::touched(&then.rows, &now.rows);
-    let touched = touched_of(&d, &now.piles, Some(now.graph()), &no_piles, &changed);
+    let touched = touched_of(&d, Some(now.graph()), &no_piles, &changed);
     assert_eq!(touched.references, vec!["@web relies-on @billing"]);
     assert!(touched.piles.is_empty() && touched.elements.is_empty());
     assert_eq!(
@@ -861,7 +830,7 @@ fn a_change_touches_each_node_and_edge_a_diagram_stands_for() {
     m.write("/.pile/nodes.toml", NODES.replace("the git binary", "git"));
     let now = Built::of(&m);
     let changed = graph::touched(&then.rows, &now.rows);
-    let touched = touched_of(&d, &now.piles, Some(now.graph()), &no_piles, &changed);
+    let touched = touched_of(&d, Some(now.graph()), &no_piles, &changed);
     assert_eq!(touched.references, vec!["external:git"]);
     assert!(touched.piles.is_empty(), "a node is not a pile");
     assert_eq!(touched.elements, vec!["git"]);
@@ -882,14 +851,13 @@ fn a_change_touches_each_node_and_edge_a_diagram_stands_for() {
             name: "git".into()
         }
     )));
-    let touched = touched_of(&d, &now.piles, Some(now.graph()), &no_piles, &changed);
+    let touched = touched_of(&d, Some(now.graph()), &no_piles, &changed);
     assert_eq!(touched.references, vec!["@web relies-on external:git"]);
 
     // A pile is touched by its files, which its caller says.
     let by_files = [BILLING.to_string()].into();
     let touched = touched_of(
         &d,
-        &then.piles,
         Some(then.graph()),
         &by_files,
         &graph::Touched::default(),
@@ -906,7 +874,6 @@ fn a_diagram_that_misses_something_says_so_though_the_change_touched_nothing_it_
     let listed = changes(
         std::slice::from_ref(&d),
         std::slice::from_ref(&d),
-        &built.piles,
         Some(built.graph()),
         &BTreeSet::new(),
         &graph::Touched::default(),
@@ -943,7 +910,7 @@ fn a_touched_line_is_marked_by_its_two_keys() {
 fn what_a_diagram_stands_for_is_a_node_for_each_box_and_an_edge_for_each_line() {
     let built = Built::of(&repository());
     let source = dependency(&format!("{}\n  box other\n{SHOWN}", boxes()));
-    let standing = standing(&diagram(&source), &built.piles, Some(built.graph()));
+    let standing = standing(&diagram(&source), Some(built.graph()));
     let keys: Vec<&str> = standing.elements.iter().map(|e| e.key.as_str()).collect();
     assert_eq!(keys, vec!["web", "billing", "git"]);
     assert_eq!(
@@ -972,8 +939,8 @@ fn what_a_diagram_stands_for_is_a_node_for_each_box_and_an_edge_for_each_line() 
 /// The page of a diagram's two versions, each held to its own graph.
 fn compared(then: &Built, before: &str, now: &Built, after: &str) -> (Swapped, String) {
     let swapped = swapped(
-        &standing(&diagram(before), &then.piles, Some(then.graph())),
-        &standing(&diagram(after), &now.piles, Some(now.graph())),
+        &standing(&diagram(before), Some(then.graph())),
+        &standing(&diagram(after), Some(now.graph())),
     );
     let read = |source: &str| diagram_format::read(source).unwrap().diagram;
     let page = draw_diff(&read(before), &read(after), &swapped, As::Html)
@@ -985,10 +952,10 @@ fn compared(then: &Built, before: &str, now: &Built, after: &str) -> (Swapped, S
 #[test]
 fn an_edited_diagram_that_only_writes_what_it_stands_for_differently_marks_nothing() {
     let built = Built::of(&repository());
-    let before = dependency(
-        "  box web pile=\"@web\"\n  box billing pile=\"@billing\"\n  box orders \
-         pile=\"@orders\"\n  line web billing\n  line orders billing\n  line orders web",
-    );
+    let before = dependency(&format!(
+        "  box web\n  box billing pile:id=\"{BILLING}\"\n  box orders \
+         pile:id=\"{ORDERS}\"\n  line web billing\n  line orders billing\n  line orders web"
+    ));
     let after = dependency(&format!(
         "  box web pile:id=\"{WEB}\"\n  box billing pile:id=\"{BILLING}\" \
          pile:name=\"billing\"\n  box orders pile:id=\"{ORDERS}\"\n  \
@@ -999,7 +966,8 @@ fn an_edited_diagram_that_only_writes_what_it_stands_for_differently_marks_nothi
     assert_eq!(
         swapped,
         Swapped::default(),
-        "each box stands for the pile it stood for, and a line that gains an edge is not marked"
+        "each box stands for the pile it stood for, and a box or a line that gains what it \
+         stands for is not marked"
     );
     assert!(
         page.contains("data-added=\"0\"")
@@ -1074,13 +1042,98 @@ fn a_box_whose_node_changes_type_under_the_same_name_is_marked() {
         ))
     };
     let (before, after) = (drawn("external"), drawn("tool"));
-    assert_eq!(
-        findings(&diagram(&after), &now.piles, Some(now.graph())),
-        vec![]
-    );
+    assert_eq!(findings(&diagram(&after), Some(now.graph())), vec![]);
     let (swapped, page) = compared(&then, &before, &now, &after);
     assert_eq!(swapped.elements, vec!["git"]);
     assert_eq!(swapped.lines, vec![]);
     assert!(page.contains("data-changed=\"1\""), "{page}");
     assert!(page.contains("CHANGED: git"), "{page}");
+}
+
+fn at_path(path: &str, source: &str) -> Diagram {
+    let name = path
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .trim_end_matches(".diagram");
+    Diagram {
+        name: name.into(),
+        dir: "/".into(),
+        path: path.into(),
+        source: Some(source.into()),
+    }
+}
+
+#[test]
+fn each_diagram_says_how_it_changed_since_a_revision() {
+    let built = Built::of(&repository());
+    let kept = dependency(&format!(
+        "  box a \"billing\" pile:id=\"{BILLING}\"\n  box b \"web\" pile:id=\"{WEB}\"\n  line a b"
+    ));
+    let quiet = dependency(&format!(
+        "  box a \"web\" pile:id=\"{WEB}\"\n  box b\n  line a b"
+    ));
+    let then = vec![
+        at_path(
+            "/.pile/diagrams/edited.diagram",
+            &dependency("  box a\n  box b\n  line a b"),
+        ),
+        at_path("/.pile/diagrams/gone.diagram", &kept),
+        at_path("/.pile/diagrams/piles.diagram", &kept),
+        at_path("/.pile/diagrams/quiet.diagram", &quiet),
+    ];
+    let now = vec![
+        at_path("/.pile/diagrams/added.diagram", &kept),
+        at_path(
+            "/.pile/diagrams/edited.diagram",
+            &dependency("  box a\n  box c\n  line a c"),
+        ),
+        at_path("/.pile/diagrams/piles.diagram", &kept),
+        at_path("/.pile/diagrams/quiet.diagram", &quiet),
+    ];
+    let touched = [BILLING.to_string()].into();
+    let found = changes(
+        &then,
+        &now,
+        Some(built.graph()),
+        &touched,
+        &graph::Touched::default(),
+    );
+    let words: Vec<(&str, Option<&str>)> = found
+        .iter()
+        .map(|l| (l.diagram.name.as_str(), l.change.as_ref().map(Change::word)))
+        .collect();
+    assert_eq!(
+        words,
+        vec![
+            ("added", Some("added")),
+            ("edited", Some("edited")),
+            ("gone", Some("removed")),
+            ("piles", Some("piles")),
+            ("quiet", None),
+        ]
+    );
+    let piles = found.iter().find(|l| l.diagram.name == "piles").unwrap();
+    let touched = piles.change.as_ref().and_then(Change::touched).unwrap();
+    assert_eq!(touched.piles, vec!["@billing"]);
+    assert_eq!(touched.references, vec!["@billing"]);
+    assert_eq!(touched.elements, vec!["a"]);
+}
+
+#[test]
+fn a_touched_pile_is_named_once_in_the_order_the_file_draws_it() {
+    let built = Built::of(&repository());
+    let d = diagram(&dependency(&format!(
+        "  box a \"web\" pile:id=\"{WEB}\"\n  box b \"billing\" pile:id=\"{BILLING}\"\n  \
+         box c \"web\" pile:id=\"{WEB}\"\n  line a b"
+    )));
+    let all = [BILLING.to_string(), WEB.to_string()].into();
+    let none = graph::Touched::default();
+    let touched = touched_of(&d, Some(built.graph()), &all, &none);
+    assert_eq!(touched.piles, vec!["@web", "@billing"]);
+    assert_eq!(touched.references, vec!["@web", "@billing"]);
+    assert_eq!(touched.elements, vec!["a", "b", "c"]);
+    assert!(touched_of(&diagram("not kdl {"), Some(built.graph()), &all, &none).is_empty());
+    // Without a graph a diagram stands for nothing, so nothing is touched.
+    assert!(touched_of(&d, None, &all, &none).is_empty());
 }

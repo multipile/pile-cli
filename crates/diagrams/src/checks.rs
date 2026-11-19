@@ -3,21 +3,17 @@
 //! every finding on the way.
 //!
 //! [`crate::meta`] reads what the file says. Here each thing it says is
-//! looked up in the graph. An element that names a pile the old way,
-//! `pile="@name"`, is looked up among the piles alone, as it always was, so
-//! it is checked with or without a graph. Everything else needs the graph:
-//! without one, only what the file alone shows is reported.
+//! looked up in the graph. Without a graph, only what the file alone shows
+//! is reported, and the diagram stands for nothing.
 
 use std::collections::BTreeSet;
 
 use diagram_format::Kind;
 use diagram_format::finding::nearest;
 use graph::{Edge, Node, Relations};
-use piles::shown;
 use query::{Database, Value};
 
-use crate::meta::{self, Include, NamedAs, Names, Place, Wrong};
-use crate::{Named, resolve};
+use crate::meta::{self, Include, NamedAs, Place, Wrong};
 
 /// The graph a diagram is held to: the rows of one state of a repository,
 /// and the database made of them, which a program is asked of.
@@ -77,9 +73,6 @@ pub struct Stands {
     /// The element's key, which a mark names it by.
     pub key: String,
     pub node: Node,
-    /// How the file names the pile, for a file written before metadata:
-    /// `@name`, or a `:/` path.
-    pub written: Option<String>,
 }
 
 /// A line that stands for an edge, whether or not a link declares it.
@@ -421,13 +414,17 @@ fn unneeded(offset: usize, message: String) -> Wrong {
 }
 
 /// Holds one diagram that reads to the repository.
-pub(crate) fn hold(read: &diagram_format::Diagram, piles: &[Named], graph: Option<Graph>) -> Held {
+pub(crate) fn hold(read: &diagram_format::Diagram, graph: Option<Graph>) -> Held {
     let mut said = meta::read(read);
     let mut held = Held {
         wrong: std::mem::take(&mut said.wrong),
         ..Held::default()
     };
     let word = meta::element_word(read.kind());
+
+    let Some(g) = graph else {
+        return held;
+    };
 
     // The elements: which node each stands for.
     let mut broken: Vec<&str> = Vec::new();
@@ -436,45 +433,23 @@ pub(crate) fn hold(read: &diagram_format::Diagram, piles: &[Named], graph: Optio
         if element.broken {
             broken.push(key);
         }
-        match &element.names {
-            None => {}
-            Some(Names::Reference { reference, id }) => {
-                let at = element.item.span.offset;
-                let (pile, wrong) = by_reference(reference, id.as_deref(), piles, at);
-                if let Some(wrong) = wrong {
-                    held.wrong.push(wrong);
-                    broken.push(key);
-                }
-                if let Some(named) = pile {
-                    held.standing.elements.push(Stands {
-                        key: key.to_string(),
-                        node: Node::Pile(named.id.clone()),
-                        written: Some(reference.clone()),
-                    });
-                }
+        let Some(named) = &element.names else {
+            continue;
+        };
+        let node = match node_of(g, named, Place::Element(word), &mut held.wrong) {
+            Ok(node) => Some(node),
+            Err(meant) => {
+                broken.push(key);
+                meant
             }
-            Some(Names::Id(named)) => {
-                let Some(g) = graph else { continue };
-                let node = match node_of(g, named, Place::Element(word), &mut held.wrong) {
-                    Ok(node) => Some(node),
-                    Err(meant) => {
-                        broken.push(key);
-                        meant
-                    }
-                };
-                if let Some(node) = node {
-                    held.standing.elements.push(Stands {
-                        key: key.to_string(),
-                        node,
-                        written: None,
-                    });
-                }
-            }
+        };
+        if let Some(node) = node {
+            held.standing.elements.push(Stands {
+                key: key.to_string(),
+                node,
+            });
         }
     }
-    let Some(g) = graph else {
-        return held;
-    };
 
     // The lines: which edge each stands for.
     for wire in &said.wires {
@@ -683,62 +658,4 @@ pub(crate) fn hold(read: &diagram_format::Diagram, piles: &[Named], graph: Optio
         held.misses.push(symbol);
     }
     held
-}
-
-/// The pile a file written before metadata names, by `pile="@name"` or a
-/// `:/` path, when there is one, and what is wrong with how it names it,
-/// given the id it wrote beside it. `at` is where the element is written.
-fn by_reference<'p>(
-    reference: &str,
-    id: Option<&str>,
-    piles: &'p [Named],
-    at: usize,
-) -> (Option<&'p Named>, Option<Wrong>) {
-    let by_reference = resolve(reference, piles);
-    let by_id = id.and_then(|id| piles.iter().find(|p| p.id == id));
-    let wrong =
-        |code: &'static str, message: String, fix: String| Some(Wrong::new(code, at, message, fix));
-    let wrong = match (by_reference, by_id, id) {
-        (Some(_), None, None) => None,
-        (Some(named), Some(with_id), _) if named.path == with_id.path => None,
-        (Some(named), Some(with_id), _) => wrong(
-            "diagram-pile-id-differs",
-            format!(
-                "{reference} is the pile at {}, and the id given is the pile at {}",
-                shown(&named.path),
-                shown(&with_id.path)
-            ),
-            format!(
-                "write the id of {reference} (pile list --full prints it), or the name of the pile the id is"
-            ),
-        ),
-        (Some(_), None, Some(id)) => wrong(
-            "diagram-pile-id-differs",
-            format!("{reference} is a pile, and no pile has the id {id}"),
-            "copy the pile's id from pile list --full, or leave id= out".to_string(),
-        ),
-        (None, Some(with_id), _) => wrong(
-            "diagram-no-such-pile",
-            format!(
-                "no pile answers to {reference}, and the pile with its id is now {}",
-                with_id.handle()
-            ),
-            format!("write pile=\"{}\"", with_id.handle()),
-        ),
-        (None, None, _) => {
-            let handles: Vec<String> = piles.iter().map(Named::handle).collect();
-            let near = nearest(reference, handles.iter().map(String::as_str));
-            let fix = match near {
-                Some(near) => format!("did you mean {near}? Write pile=\"{near}\""),
-                None => "name one of the piles pile list prints, as @name or as its :/ path, or leave pile= out"
-                    .to_string(),
-            };
-            wrong(
-                "diagram-no-such-pile",
-                format!("no pile answers to {reference}"),
-                fix,
-            )
-        }
-    };
-    (by_reference, wrong)
 }

@@ -635,38 +635,6 @@ fn while_a_config_does_not_read_a_diagram_is_held_to_its_file_alone() {
     );
 }
 
-#[test]
-fn a_diagram_written_with_pile_checks_lists_and_draws_as_it_did() {
-    let r = graphed();
-    r.write(
-        ".pile/diagrams/old.diagram",
-        &format!(
-            "diagram dependency version=1 {{\n  title \"Old\"\n  desc \"Written before metadata.\"\n  \
-             box posts pile=\"@posts\" id=\"{}\"\n  box db pile=\":/db\"\n  line posts db\n}}\n",
-            id_of("posts")
-        ),
-    );
-    r.write("db/schema.sql", "one\n");
-    r.commit("an old diagram");
-    assert_eq!(found(&r, "old"), vec![]);
-    r.write("db/schema.sql", "two\n");
-    let d = listed(&r, "HEAD", "old");
-    assert_eq!(d["change"], "piles");
-    assert_eq!(d["piles"], json!([":/db"]), "as the file names it");
-    assert_eq!(d["touched"], json!(["@db"]), "as pile query writes it");
-    assert_eq!(d["misses"], json!([]));
-    r.result(&["diagram", "render", "--since", "HEAD", "old"]);
-    let page = r.read("old.html");
-    assert!(
-        page.contains("data-changed=\"1\""),
-        "the box of @db is marked"
-    );
-    assert!(
-        page.contains("data-pile-ref=\"@posts\"") && !page.contains("data-pile=\""),
-        "the page has data-pile-ref where it had data-pile"
-    );
-}
-
 /// What a review's comment is built from: a diagram of two boxes, a line
 /// that stands for the link between them, and an include; a change that
 /// edits the link's title and adds a pile the include finds.
@@ -747,17 +715,17 @@ fn marked(r: &Repo, name: &str) -> (String, [bool; 3]) {
 }
 
 #[test]
-fn an_edited_diagram_rewritten_from_pile_to_pile_id_marks_only_what_is_drawn_differently() {
+fn an_edited_diagram_that_gains_what_it_stands_for_marks_only_what_is_drawn_differently() {
     let r = graphed();
     r.write(
         ".pile/diagrams/users.diagram",
         "diagram dependency version=1 {\n  title \"What uses the shared types\"\n  \
          desc \"The pages and both services take their types from the shared package.\"\n  \
-         box ui pile=\"@ui\"\n  box posts pile=\"@posts\"\n  box auth pile=\"@auth\"\n  \
-         box shared pile=\"@shared\" focal=#true\n  line ui shared\n  line posts shared\n  \
+         box ui\n  box posts\n  box auth\n  \
+         box shared focal=#true\n  line ui shared\n  line posts shared\n  \
          line auth shared\n  line ui auth\n}\n",
     );
-    r.commit("a diagram written before metadata");
+    r.commit("a diagram whose boxes stand for nothing");
     r.git(&["switch", "-q", "-c", "feature"]);
     r.write(
         ".pile/diagrams/users.diagram",
@@ -773,14 +741,14 @@ fn an_edited_diagram_rewritten_from_pile_to_pile_id_marks_only_what_is_drawn_dif
             id_of("shared"),
         ),
     );
-    r.commit("write it as metadata, without the line that stood for nothing");
+    r.commit("say what each box and line stands for, without the line that stands for nothing");
     assert_eq!(found(&r, "users"), vec![]);
 
     let (page, none) = marked(&r, "users");
     assert_eq!(
         none,
         [true, false, true],
-        "nothing is added or changed: each box stands for the pile it stood for"
+        "nothing is added or changed: a box that gains what it stands for is drawn as it was"
     );
     assert!(page.contains("data-removed=\"1\""), "the line that is gone");
     assert!(page.contains("REMOVED: ui → auth"), "{page}");
