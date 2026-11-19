@@ -968,3 +968,119 @@ fn what_a_diagram_stands_for_is_a_node_for_each_box_and_an_edge_for_each_line() 
         ]
     );
 }
+
+/// The page of a diagram's two versions, each held to its own graph.
+fn compared(then: &Built, before: &str, now: &Built, after: &str) -> (Swapped, String) {
+    let swapped = swapped(
+        &standing(&diagram(before), &then.piles, Some(then.graph())),
+        &standing(&diagram(after), &now.piles, Some(now.graph())),
+    );
+    let read = |source: &str| diagram_format::read(source).unwrap().diagram;
+    let page = draw_diff(&read(before), &read(after), &swapped, As::Html)
+        .unwrap()
+        .unwrap();
+    (swapped, String::from_utf8(page.bytes).unwrap())
+}
+
+#[test]
+fn an_edited_diagram_that_only_writes_what_it_stands_for_differently_marks_nothing() {
+    let built = Built::of(&repository());
+    let before = dependency(
+        "  box web pile=\"@web\"\n  box billing pile=\"@billing\"\n  box orders \
+         pile=\"@orders\"\n  line web billing\n  line orders billing\n  line orders web",
+    );
+    let after = dependency(&format!(
+        "  box web pile:id=\"{WEB}\"\n  box billing pile:id=\"{BILLING}\" \
+         pile:name=\"billing\"\n  box orders pile:id=\"{ORDERS}\"\n  \
+         line web billing pile:edge=\"relies-on\"\n  line orders billing pile:edge=\"relies-on\""
+    ));
+    assert_eq!(held(&after), vec![]);
+    let (swapped, page) = compared(&built, &before, &built, &after);
+    assert_eq!(
+        swapped,
+        Swapped::default(),
+        "each box stands for the pile it stood for, and a line that gains an edge is not marked"
+    );
+    assert!(
+        page.contains("data-added=\"0\"")
+            && page.contains("data-removed=\"1\"")
+            && page.contains("data-changed=\"0\""),
+        "only the line that is gone is marked: {page}"
+    );
+    assert!(page.contains("REMOVED: orders → web"), "{page}");
+    // And back: a box and a line that lose what they stand for.
+    let (swapped, _) = compared(&built, &after, &built, &before);
+    assert_eq!(swapped, Swapped::default());
+}
+
+#[test]
+fn a_box_that_stands_for_another_pile_under_its_key_is_marked_with_its_line() {
+    let built = Built::of(&repository());
+    let drawn = |id: &str, name: &str| {
+        dependency(&format!(
+            "  box buyer pile:id=\"{id}\" pile:name=\"{name}\"\n  box billing pile:id=\"{BILLING}\"\n  box git\n  \
+             line buyer billing pile:edge=\"relies-on\"\n  line billing git"
+        ))
+    };
+    let (before, after) = (drawn(WEB, "web"), drawn(ORDERS, "orders"));
+    assert_eq!(held(&after), vec![]);
+    let (swapped, page) = compared(&built, &before, &built, &after);
+    assert_eq!(swapped.elements, vec!["buyer"]);
+    assert_eq!(
+        swapped.lines,
+        vec![("buyer".to_string(), "billing".to_string())],
+        "the line stands for the link from another pile"
+    );
+    assert!(
+        page.contains("data-changed=\"2\"") && page.contains("data-removed=\"0\""),
+        "{page}"
+    );
+    assert!(page.contains("CHANGED: buyer → billing · buyer"), "{page}");
+    // Without what the caller found, the two versions are drawn the same.
+    let read = |source: &str| diagram_format::read(source).unwrap().diagram;
+    let plain = draw_diff(&read(&before), &read(&after), &Swapped::default(), As::Html)
+        .unwrap()
+        .unwrap();
+    assert!(
+        String::from_utf8(plain.bytes)
+            .unwrap()
+            .contains("data-changed=\"0\"")
+    );
+}
+
+#[test]
+fn a_box_whose_node_changes_type_under_the_same_name_is_marked() {
+    let then = Built::of(&repository());
+    let mut m = repository();
+    m.write(
+        "/words/.pile/types.toml",
+        TYPES.replace(
+            "[[edge-types]]\nname = \"relies-on\"",
+            "[[node-types]]\nname = \"tool\"\ntitle = \"a program a pile runs\"\n\n\
+             [[edge-types]]\nname = \"relies-on\"",
+        ),
+    );
+    m.write(
+        "/.pile/nodes.toml",
+        format!(
+            "{NODES}\n[[nodes]]\ntype = \"tool\"\nname = \"git\"\ntitle = \"git, as a tool\"\n"
+        ),
+    );
+    let now = Built::of(&m);
+    let drawn = |of_type: &str| {
+        dependency(&format!(
+            "  box web pile:id=\"{WEB}\"\n  box git pile:id=\"{TOP}\" pile:node-type={of_type}\n  \
+             line web git"
+        ))
+    };
+    let (before, after) = (drawn("external"), drawn("tool"));
+    assert_eq!(
+        findings(&diagram(&after), &now.piles, Some(now.graph())),
+        vec![]
+    );
+    let (swapped, page) = compared(&then, &before, &now, &after);
+    assert_eq!(swapped.elements, vec!["git"]);
+    assert_eq!(swapped.lines, vec![]);
+    assert!(page.contains("data-changed=\"1\""), "{page}");
+    assert!(page.contains("CHANGED: git"), "{page}");
+}

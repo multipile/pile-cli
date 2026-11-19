@@ -519,11 +519,30 @@ fn render(m: &ArgMatches, out: &mut Out) -> Result {
             let before = diagrams::found(&then)
                 .into_iter()
                 .find(|d| d.path == diagram.path)
-                .and_then(|d| d.source)
+                .filter(|d| d.source.is_some())
                 .ok_or_else(|| not_comparable("its file there is not text"))?;
-            let before = diagrams::format::read(&before)
+            let before_read = diagrams::format::read(before.source.as_deref().unwrap_or_default())
                 .map_err(|_| not_comparable("its file there breaks a rule of its format"))?;
-            diagrams::draw_diff(&before.diagram, &read, as_)
+            // What stands for another node or link than it did: each
+            // version is held to the graph of its own state. Where the
+            // revision's declarations do not read there is no graph to
+            // hold the first version to, and only what is drawn is
+            // compared.
+            let swapped = match (piles::structure(&then), graph) {
+                (Ok(s_then), Some(graph)) => {
+                    let declared_then = Declared::of(&then, &s_then);
+                    diagrams::swapped(
+                        &diagrams::standing(
+                            &before,
+                            &named_piles(&s_then),
+                            Some(declared_then.graph()),
+                        ),
+                        &diagrams::standing(diagram, &named, Some(graph)),
+                    )
+                }
+                _ => diagrams::Swapped::default(),
+            };
+            diagrams::draw_diff(&before_read.diagram, &read, &swapped, as_)
                 .ok_or_else(|| not_comparable("it was a diagram of another type"))?
                 .map_err(failed)?
         }

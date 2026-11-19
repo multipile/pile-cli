@@ -97,4 +97,8 @@ the change touches each diagram:
 
 `pile diagram render --since <revision> <name>` draws a diagram with its
 change: an edited one as its two versions in one, and a `piles` one with
-each touched box and line marked.
+each touched box and line marked. In an edited one, a box is marked as
+changed when it is drawn differently or stands for another node, and a
+line when it is drawn differently or stands for another link. How the file
+writes what one stands for marks nothing: `pile="@name"` rewritten as the
+same pile's `pile:id` is no change, nor is a line that gains `pile:edge`.

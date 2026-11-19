@@ -109,6 +109,48 @@ impl Standing {
     }
 }
 
+/// The elements and the lines of a diagram's second version that stand for
+/// something other than they did in its first, each by its key.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Swapped {
+    /// The keys of the elements that stand for another node.
+    pub elements: Vec<String>,
+    /// The two keys of each line that stands for another edge.
+    pub lines: Vec<(String, String)>,
+}
+
+/// What of a diagram's second version stands for something other than it
+/// did in its first: an element of the same key that stood for a node and
+/// now stands for another, and a line between the same two keys that stood
+/// for an edge and now stands for another. A pile is the same node
+/// whatever its name and wherever it is, any other node is the same by its
+/// type and its name, and an edge by its source, its type and its target.
+/// How the file writes any of it does not count. Neither does an element
+/// or a line that stands for nothing in one version: it gained or lost
+/// what it stands for, and shows what it did.
+pub fn swapped(before: &Standing, after: &Standing) -> Swapped {
+    Swapped {
+        elements: after
+            .elements
+            .iter()
+            .filter(|now| before.node(&now.key).is_some_and(|was| was != &now.node))
+            .map(|now| now.key.clone())
+            .collect(),
+        lines: after
+            .lines
+            .iter()
+            .filter(|now| {
+                before
+                    .lines
+                    .iter()
+                    .find(|was| was.from == now.from && was.to == now.to)
+                    .is_some_and(|was| was.edge != now.edge)
+            })
+            .map(|now| (now.from.clone(), now.to.clone()))
+            .collect(),
+    }
+}
+
 /// A diagram held to the repository.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Held {

@@ -272,24 +272,34 @@ fn a_touched_pile_is_named_once_as_the_file_names_it_in_the_order_it_names_them(
 fn a_change_is_drawn_as_a_diff_and_touched_piles_as_marks() {
     let before = diagram_format::read(&dependency("  box a\n  box b\n  line a b")).unwrap();
     let after = diagram_format::read(&dependency("  box a\n  box c\n  line a c")).unwrap();
-    let html = draw_diff(&before.diagram, &after.diagram, As::Html)
-        .unwrap()
-        .unwrap();
+    let html = draw_diff(
+        &before.diagram,
+        &after.diagram,
+        &Swapped::default(),
+        As::Html,
+    )
+    .unwrap()
+    .unwrap();
     let page = String::from_utf8(html.bytes).unwrap();
     assert!(
         page.contains("data-added=\"2\"") && page.contains("data-removed=\"2\""),
         "{page}"
     );
-    let gif = draw_diff(&before.diagram, &after.diagram, As::Gif)
-        .unwrap()
-        .unwrap();
+    let gif = draw_diff(
+        &before.diagram,
+        &after.diagram,
+        &Swapped::default(),
+        As::Gif,
+    )
+    .unwrap()
+    .unwrap();
     assert!(gif.duration_ms.is_some_and(|ms| ms > 0));
     let tree = diagram_format::read(
         "diagram tree version=1 {\n  title \"T\"\n  desc \"A tree.\"\n  item \"root\"\n}\n",
     )
     .unwrap();
     assert!(
-        draw_diff(&before.diagram, &tree.diagram, As::Png).is_none(),
+        draw_diff(&before.diagram, &tree.diagram, &Swapped::default(), As::Png).is_none(),
         "two types"
     );
 

@@ -15,7 +15,8 @@
 //! edge a line does, what the diagram should show, as Datalog programs, and
 //! what it leaves out on purpose. Held to the graph, that gives doctor's
 //! findings ([`findings`]), what a change touched of what a diagram stands
-//! for ([`changes`]), and what it should show and does not ([`misses`]).
+//! for ([`changes`]), what an edited diagram stands for that it did not
+//! ([`swapped`]), and what it should show and does not ([`misses`]).
 
 use std::collections::BTreeSet;
 
@@ -29,7 +30,7 @@ use storage::Content;
 mod checks;
 pub mod meta;
 
-pub use checks::{Draws, Graph, Standing, Stands};
+pub use checks::{Draws, Graph, Standing, Stands, Swapped, swapped};
 
 /// One diagram a pile keeps.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -307,14 +308,24 @@ pub fn draw(diagram: &diagram_format::Diagram, as_: As) -> Result<Drawn, String>
 /// Draws a diagram's two versions as one: still, the second with what was
 /// added, removed and changed marked, and listed under it; as a gif, the
 /// first becoming the second. None when the two are of different types.
+///
+/// What both versions have is marked as changed when it is drawn
+/// differently, which multipile's diagrams find, and when it is in
+/// `swapped`: drawn the same, it stands for something else. Metadata that
+/// is only written differently marks nothing.
 pub fn draw_diff(
     before: &diagram_format::Diagram,
     after: &diagram_format::Diagram,
+    swapped: &Swapped,
     as_: As,
 ) -> Option<Result<Drawn, String>> {
-    let still = diagram_document::diff_document(before, after, false).ok()?;
+    let also = |mark: Mark| match mark {
+        Mark::Element(key) => swapped.elements.iter().any(|e| e == key),
+        Mark::Line { from, to } => swapped.lines.iter().any(|(f, t)| f == from && t == to),
+    };
+    let still = diagram_document::diff_document(before, after, false, also).ok()?;
     let moving = match as_ {
-        As::Gif => Some(diagram_document::diff_document(before, after, true).ok()?),
+        As::Gif => Some(diagram_document::diff_document(before, after, true, also).ok()?),
         _ => None,
     };
     Some(draw_documents(&still, moving.as_ref(), as_))

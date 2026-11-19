@@ -734,3 +734,174 @@ fn a_review_gets_the_touched_link_and_the_missed_pile() {
     );
     assert_eq!(d["misses"], json!(["@orders"]));
 }
+
+/// What `pile diagram render --since main...` marks in an edited diagram:
+/// how many elements and lines are added, removed and changed.
+fn marked(r: &Repo, name: &str) -> (String, [bool; 3]) {
+    let v = r.result(&["diagram", "render", "--since", "main...", name]);
+    assert_eq!(v["change"], "edited", "{v}");
+    let page = r.read(&format!("{name}.html"));
+    let none =
+        ["added", "removed", "changed"].map(|what| page.contains(&format!("data-{what}=\"0\"")));
+    (page, none)
+}
+
+#[test]
+fn an_edited_diagram_rewritten_from_pile_to_pile_id_marks_only_what_is_drawn_differently() {
+    let r = graphed();
+    r.write(
+        ".pile/diagrams/users.diagram",
+        "diagram dependency version=1 {\n  title \"What uses the shared types\"\n  \
+         desc \"The pages and both services take their types from the shared package.\"\n  \
+         box ui pile=\"@ui\"\n  box posts pile=\"@posts\"\n  box auth pile=\"@auth\"\n  \
+         box shared pile=\"@shared\" focal=#true\n  line ui shared\n  line posts shared\n  \
+         line auth shared\n  line ui auth\n}\n",
+    );
+    r.commit("a diagram written before metadata");
+    r.git(&["switch", "-q", "-c", "feature"]);
+    r.write(
+        ".pile/diagrams/users.diagram",
+        &format!(
+            "diagram dependency version=1 {{\n  title \"What uses the shared types\"\n  \
+             desc \"The pages and both services take their types from the shared package.\"\n  \
+             box ui pile:id=\"{}\"\n  box posts pile:id=\"{}\"\n  box auth pile:id=\"{}\"\n  \
+             box shared pile:id=\"{}\" focal=#true\n  line ui shared pile:edge=\"relies-on\"\n  \
+             line posts shared pile:edge=\"relies-on\"\n  line auth shared pile:edge=\"relies-on\"\n}}\n",
+            id_of("ui"),
+            id_of("posts"),
+            id_of("auth"),
+            id_of("shared"),
+        ),
+    );
+    r.commit("write it as metadata, without the line that stood for nothing");
+    assert_eq!(found(&r, "users"), vec![]);
+
+    let (page, none) = marked(&r, "users");
+    assert_eq!(
+        none,
+        [true, false, true],
+        "nothing is added or changed: each box stands for the pile it stood for"
+    );
+    assert!(page.contains("data-removed=\"1\""), "the line that is gone");
+    assert!(page.contains("REMOVED: ui → auth"), "{page}");
+    assert!(!page.contains("data-id=\"badge:changed\""));
+    // The same as a picture, and moving.
+    r.result(&[
+        "diagram", "render", "--since", "main...", "--as", "png", "users",
+    ]);
+    let v = r.result(&[
+        "diagram", "render", "--since", "main...", "--as", "gif", "users",
+    ]);
+    assert!(v["duration_ms"].as_u64().unwrap() > 0);
+}
+
+#[test]
+fn an_edited_diagram_marks_a_box_that_stands_for_another_pile_under_its_key() {
+    let r = graphed();
+    r.git(&["switch", "-q", "-c", "feature"]);
+    // The box keeps its key, and so what it shows, and stands for @shared.
+    r.write(
+        ".pile/diagrams/services.diagram",
+        &services().replace(
+            &format!("\"{}\"", id_of("db")),
+            &format!("\"{}\" pile:name=\"shared\"", id_of("shared")),
+        ),
+    );
+    r.commit("the store is the shared package");
+    assert_eq!(found(&r, "services"), vec![]);
+    let (page, none) = marked(&r, "services");
+    assert_eq!(none, [true, true, false]);
+    assert!(
+        page.contains("data-changed=\"2\"") && page.contains("CHANGED: posts → db · db"),
+        "the box, and the line that stands for the link to another pile: {page}"
+    );
+    for as_ in ["png", "gif"] {
+        r.result(&[
+            "diagram", "render", "--since", "main...", "--as", as_, "services",
+        ]);
+    }
+
+    // A line that stands for nothing in either version is not marked.
+    r.git(&["switch", "-q", "main"]);
+    r.write(
+        ".pile/diagrams/services.diagram",
+        &services().replace(" pile:edge=\"relies-on\"", ""),
+    );
+    r.commit("the line stands for nothing");
+    r.git(&["switch", "-q", "-c", "other"]);
+    r.write(
+        ".pile/diagrams/services.diagram",
+        &services().replace(" pile:edge=\"relies-on\"", "").replace(
+            &format!("\"{}\"", id_of("db")),
+            &format!("\"{}\" pile:name=\"shared\"", id_of("shared")),
+        ),
+    );
+    r.commit("the store is the shared package");
+    let (page, _) = marked(&r, "services");
+    assert!(
+        page.contains("data-changed=\"1\"") && page.contains("CHANGED: db"),
+        "{page}"
+    );
+}
+
+#[test]
+fn an_edited_diagram_marks_a_box_whose_node_changes_type_under_the_same_name() {
+    let r = graphed();
+    let with_git = |of_type: &str| {
+        services().replace(
+            "  line posts db",
+            &format!(
+                "  box git pile:id=\"{}\" pile:node-type={of_type}\n  line db git\n  line posts db",
+                id_of("a")
+            ),
+        )
+    };
+    r.write(".pile/diagrams/services.diagram", &with_git("external"));
+    r.commit("draw git");
+    r.git(&["switch", "-q", "-c", "feature"]);
+    r.write(
+        "aux/words/.pile/types.toml",
+        &format!("{TYPES}\n[[node-types]]\nname = \"tool\"\ntitle = \"a program a pile runs\"\n"),
+    );
+    r.write(
+        ".pile/nodes.toml",
+        "version = \"gitpile/1\"\n\n[[nodes]]\ntype = \"external\"\nname = \"git\"\n\
+         title = \"the git binary\"\n\n[[nodes]]\ntype = \"tool\"\nname = \"git\"\n\
+         title = \"git, as a tool\"\n",
+    );
+    r.write(".pile/diagrams/services.diagram", &with_git("tool"));
+    r.commit("git is a tool");
+    assert_eq!(found(&r, "services"), vec![]);
+    let (page, none) = marked(&r, "services");
+    assert_eq!(none, [true, true, false]);
+    assert!(
+        page.contains("data-changed=\"1\"") && page.contains("CHANGED: git"),
+        "{page}"
+    );
+}
+
+#[test]
+fn an_edited_diagram_whose_earlier_declarations_do_not_read_is_compared_as_drawn() {
+    let r = graphed();
+    r.write(
+        "db/.pile/config",
+        "kind = gitpile\nversion = 1\nid = nonsense\n",
+    );
+    r.commit("a config that does not read");
+    r.git(&["switch", "-q", "-c", "feature"]);
+    r.declare("db", "db", "db");
+    r.write(
+        ".pile/diagrams/services.diagram",
+        &services().replace(
+            &format!("\"{}\"", id_of("db")),
+            &format!("\"{}\" pile:name=\"shared\"", id_of("shared")),
+        ),
+    );
+    r.commit("the config reads, and the store is the shared package");
+    let (_, none) = marked(&r, "services");
+    assert_eq!(
+        none,
+        [true, true, true],
+        "nothing says what the first version stood for, and it is drawn the same"
+    );
+}
