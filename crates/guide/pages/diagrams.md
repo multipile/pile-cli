@@ -51,9 +51,8 @@ declares, so that a diagram does not go out of date unnoticed.
   type from its first box's node to its second's (`pile guide links`).
 
 A box or a line with none of them stands for nothing, and is only drawn.
-A file that names a pile as `pile="@lib"` still reads. Write `pile:id`
-in a new one. `pile guide diagram-includes` says how a diagram says what
-it should show, so that a pile added later is not left out of it.
+`pile guide diagram-includes` says how a diagram says what it should
+show, so that a pile added later is not left out of it.
 
 ## doctor checks each diagram
 
@@ -97,4 +96,10 @@ the change touches each diagram:
 
 `pile diagram render --since <revision> <name>` draws a diagram with its
 change: an edited one as its two versions in one, and a `piles` one with
-each touched box and line marked.
+each touched box and line marked. In an edited one, a box is marked as
+changed when it is drawn differently or stands for another node, and a
+line when it is drawn differently or stands for another link. How the file
+writes what one stands for marks nothing: `pile:name` written beside the
+same pile's `pile:id` is no change, nor is a box that gains `pile:id` or
+a line that gains `pile:edge`. An edited diagram whose earlier version
+does not read is refused as `diagram-not-comparable`.

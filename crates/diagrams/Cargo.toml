@@ -20,7 +20,11 @@ query = { path = "../query" }
 # the reader of a .diagram file and the rules it holds a diagram to; the
 # document a diagram is painted into; the page written from it; and the
 # picture takumi renders from it.
-diagram-format = { git = "https://github.com/multipile/diagrams", rev = "f3134e09c8def8110dc0f795c2dcb5bcad62432e" }
-diagram-document = { git = "https://github.com/multipile/diagrams", rev = "f3134e09c8def8110dc0f795c2dcb5bcad62432e" }
-diagram-html = { git = "https://github.com/multipile/diagrams", rev = "f3134e09c8def8110dc0f795c2dcb5bcad62432e" }
-diagram-render = { git = "https://github.com/multipile/diagrams", rev = "f3134e09c8def8110dc0f795c2dcb5bcad62432e" }
+diagram-format = { git = "https://github.com/multipile/diagrams", rev = "e8c87e5021bd194c268169fdbe1920515b449b3e" }
+diagram-document = { git = "https://github.com/multipile/diagrams", rev = "e8c87e5021bd194c268169fdbe1920515b449b3e" }
+diagram-html = { git = "https://github.com/multipile/diagrams", rev = "e8c87e5021bd194c268169fdbe1920515b449b3e" }
+diagram-render = { git = "https://github.com/multipile/diagrams", rev = "e8c87e5021bd194c268169fdbe1920515b449b3e" }
+
+[dev-dependencies]
+# The tests read the manifest of the diagrams' cases.
+serde_json = "1.0.151"

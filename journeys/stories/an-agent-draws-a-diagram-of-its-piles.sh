@@ -3,7 +3,7 @@
 # diagram in the top pile's .pile/diagrams/. It copies each pile's id from
 # pile list --full, misnames a box, lets doctor find it, fixes it, and
 # draws the diagram as a page, a picture and an animation. A diagram
-# somebody wrote earlier, which names its piles the old way, still passes.
+# somebody wrote earlier, whose boxes stand for the same piles, is drawn too.
 #
 # A diagram says what it shows and never where. A box stands for a pile by
 # pile:id, and its name is the pile's name. doctor reads every diagram, and
@@ -19,14 +19,17 @@ pp init --set name=app
 explain . 'The application.'
 mkdir -p lib && within lib pp init --set name=lib
 explain lib 'The library the application is built on.'
-write .pile/diagrams/before.diagram 'diagram dependency version=1 {
-  title "What there was before"
-  desc "The application and its library, as somebody drew them earlier."
-  box app pile="@app"
-  box lib pile="@lib"
+pp list --full --format json
+app=$(jq -r '.result.piles[] | select(.name == "app") | .id' <<<"$stdout")
+lib=$(jq -r '.result.piles[] | select(.name == "lib") | .id' <<<"$stdout")
+write .pile/diagrams/before.diagram "diagram dependency version=1 {
+  title \"What there was before\"
+  desc \"The application and its library, as somebody drew them earlier.\"
+  box app pile:id=\"$app\"
+  box lib pile:id=\"$lib\"
   line app lib
 }
-'
+"
 commit "Declare the application and its library"
 
 export AGENT=its-harness
@@ -79,10 +82,10 @@ pp diagram render -o docs/layers.gif layers
 field .result.as gif "-o's ending says gif when --as is not given"
 field -c '.result.duration_ms > 0' true "and the animation moves"
 
-say "IV. the diagram written with pile= still reads, and is drawn"
+say "IV. the diagram somebody drew earlier is drawn the same way"
 
 pp diagram render before
-field .result.out before.html "a diagram that names a pile as pile=\"@lib\" is drawn as it was"
+field .result.out before.html "the earlier diagram is drawn, named after itself"
 
 say "V. the person beside it reads text"
 

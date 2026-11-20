@@ -9,11 +9,15 @@ written under the owner `pile`, which this crate alone reads: the node a
 box stands for, the edge a line stands for, the Datalog programs that say
 what the diagram should show, and what it leaves out on purpose, with the
 reason. So does what follows from them: which nodes and edges a diagram
-should show and does not, and which of those it stands for a change
-touched. Handing a diagram that reads to multipile's diagrams to draw
-belongs here too. What a diagram may say, how it is laid out, how it looks
-and how it is rendered do not belong here: they are multipile's diagrams',
-pinned in this crate's manifest, which keep metadata and never read it.
+should show and does not, which of those it stands for a change
+touched, and what changed in an edited diagram: what its two versions
+draw differently, and each box or line that now stands for something
+else. Handing a diagram that reads to multipile's diagrams to draw
+belongs here too, with the change this crate decides. What a diagram may
+say, how it is laid out, how it looks and how it is rendered do not
+belong here: they are multipile's diagrams', pinned in this crate's
+manifest, which keep metadata and never read it, report what two
+versions draw differently, and draw exactly the change they are told.
 Neither does which rows a declaration becomes, how a program is evaluated,
 a command, or how an answer is printed. Nothing here knows git, and
 nothing here writes.

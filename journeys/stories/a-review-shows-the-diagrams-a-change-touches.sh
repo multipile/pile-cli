@@ -10,8 +10,10 @@
 # from where the branch left main. A diagram is added, edited, removed, or
 # touched through what it stands for: a box stands for a pile by pile:id,
 # and a line for a link by pile:edge. A pile is touched by its files, and a
-# link by what it declares. (pile guide diagrams, pile diagram list --help,
-# pile diagram render --help)
+# link by what it declares. An edited diagram marks a box as changed when
+# it is drawn differently or stands for another node, and never for how
+# its file writes what it stands for. (pile guide diagrams, pile diagram
+# list --help, pile diagram render --help)
 . "$JOURNEY_LIB"
 
 repo
@@ -41,6 +43,7 @@ write lib/code.rs 'one
 pp list --full --format json
 app=$(jq -r '.result.piles[] | select(.name == "app") | .id' <<<"$stdout")
 lib=$(jq -r '.result.piles[] | select(.name == "lib") | .id' <<<"$stdout")
+words=$(jq -r '.result.piles[] | select(.name == "words") | .id' <<<"$stdout")
 write .pile/diagrams/layers.diagram "diagram dependency version=1 {
   title \"What the application is built on\"
   desc \"The application depends on its library.\"
@@ -109,5 +112,31 @@ pp diagram render --since main... layers
 same "$(grep -c 'data-changed="3"' layers.html)" 1 "both boxes and the line between them are marked"
 refuses diagram render --since main... --as gif layers
 field .error.code diagram-still "and it is still, so it is not a gif"
+
+say "IV. an edited diagram marks what stands for another node, and not what is only written differently"
+
+write .pile/diagrams/layers.diagram "diagram dependency version=1 {
+  title \"What the application is built on\"
+  desc \"The application depends on its library.\"
+  box app pile:id=\"$app\" pile:name=\"app\"
+  box lib pile:id=\"$lib\" pile:name=\"lib\"
+  line app lib
+}
+"
+pp diagram render --since main... layers
+field .result.change edited "the diagram now writes each pile's name beside its id, and its line stands for nothing"
+same "$(grep -c 'data-changed="0"' layers.html)" 1 "each box stands for the pile it stood for, so nothing is marked"
+write .pile/diagrams/layers.diagram "diagram dependency version=1 {
+  title \"What the application is built on\"
+  desc \"The application depends on its library.\"
+  box app pile:id=\"$app\"
+  box lib pile:id=\"$words\" pile:name=\"words\"
+  line app lib
+}
+"
+pp diagram render --since main... layers
+same "$(grep -c 'data-changed="1"' layers.html)" 1 "the box drawn as it was now stands for another pile, and is marked"
+pp diagram render --since main... -o layers.gif layers
+field -c '.result.duration_ms > 0' true "and the edited diagram moves, as a gif"
 
 verdict

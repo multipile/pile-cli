@@ -196,18 +196,6 @@ fn since_of(r: &crate::repository::Repository, m: &ArgMatches) -> Result<Option<
     }))
 }
 
-/// The piles a diagram may name, as the working copy declares them.
-fn named_piles(s: &piles::Structure) -> Vec<diagrams::Named> {
-    s.ordered()
-        .into_iter()
-        .map(|p| diagrams::Named {
-            path: p.path.clone(),
-            name: p.name.clone(),
-            id: p.id.clone(),
-        })
-        .collect()
-}
-
 /// A change since a revision: the diagrams there were at the revision, and
 /// what the change from there to the working copy touched.
 struct Changed {
@@ -266,7 +254,6 @@ fn changes_since(
     Ok(diagrams::changes(
         &changed.then,
         now,
-        &named_piles(s),
         Some(declared.graph()),
         &changed.piles,
         &changed.touched,
@@ -459,14 +446,13 @@ fn render(m: &ArgMatches, out: &mut Out) -> Result {
         .as_deref()
         .ok_or_else(|| invalid(diagram, "it is not UTF-8 text"))?;
     let read = diagram_read(diagram, source)?;
-    let named = named_piles(&s);
     // The graph is built only for a diagram that says something of it, or
     // is drawn with a change.
     let declared =
         (since.is_some() || diagrams::asks_graph(&read)).then(|| Declared::of(&found, &s));
     let graph = declared.as_ref().map(Declared::graph);
     // A diagram that misses what it should show is still drawn.
-    let wrong: Vec<_> = diagrams::findings(diagram, &named, graph)
+    let wrong: Vec<_> = diagrams::findings(diagram, graph)
         .into_iter()
         .filter(diagrams::stops_drawing)
         .collect();
@@ -482,7 +468,6 @@ fn render(m: &ArgMatches, out: &mut Out) -> Result {
             diagrams::listed(
                 &changed.then,
                 diagram,
-                &named,
                 graph,
                 &changed.piles,
                 &changed.touched,
@@ -519,11 +504,26 @@ fn render(m: &ArgMatches, out: &mut Out) -> Result {
             let before = diagrams::found(&then)
                 .into_iter()
                 .find(|d| d.path == diagram.path)
-                .and_then(|d| d.source)
+                .filter(|d| d.source.is_some())
                 .ok_or_else(|| not_comparable("its file there is not text"))?;
-            let before = diagrams::format::read(&before)
+            let before_read = diagrams::format::read(before.source.as_deref().unwrap_or_default())
                 .map_err(|_| not_comparable("its file there breaks a rule of its format"))?;
-            diagrams::draw_diff(&before.diagram, &read, as_)
+            // What stands for another node or link than it did: each
+            // version is held to the graph of its own state. Where the
+            // revision's declarations do not read there is no graph to
+            // hold the first version to, and only what is drawn is
+            // compared.
+            let swapped = match (piles::structure(&then), graph) {
+                (Ok(s_then), Some(graph)) => {
+                    let declared_then = Declared::of(&then, &s_then);
+                    diagrams::swapped(
+                        &diagrams::standing(&before, Some(declared_then.graph())),
+                        &diagrams::standing(diagram, Some(graph)),
+                    )
+                }
+                _ => diagrams::Swapped::default(),
+            };
+            diagrams::draw_diff(&before_read.diagram, &read, &swapped, as_)
                 .ok_or_else(|| not_comparable("it was a diagram of another type"))?
                 .map_err(failed)?
         }

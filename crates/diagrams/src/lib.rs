@@ -15,21 +15,21 @@
 //! edge a line does, what the diagram should show, as Datalog programs, and
 //! what it leaves out on purpose. Held to the graph, that gives doctor's
 //! findings ([`findings`]), what a change touched of what a diagram stands
-//! for ([`changes`]), and what it should show and does not ([`misses`]).
+//! for ([`changes`]), what an edited diagram stands for that it did not
+//! ([`swapped`]), and what it should show and does not ([`misses`]).
 
 use std::collections::BTreeSet;
 
-use diagram_document::Mark;
+use diagram_document::{Report, Subject};
 pub use diagram_format as format;
 use diagram_format::finding::locate;
 use piles::doctor::{Finding, Severity, Survey};
-use piles::{FROM_TOP, ROOT, SIGIL, shown};
 use storage::Content;
 
 mod checks;
 pub mod meta;
 
-pub use checks::{Draws, Graph, Standing, Stands};
+pub use checks::{Draws, Graph, Standing, Stands, Swapped, swapped};
 
 /// One diagram a pile keeps.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,49 +62,14 @@ pub fn found(files: &[Content]) -> Vec<Diagram> {
     all
 }
 
-/// A pile a diagram may name: where it is, its name, and its id.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Named {
-    pub path: String,
-    pub name: String,
-    pub id: String,
-}
-
-impl Named {
-    /// How the pile is typed: `@name`, or its `:/` path when it has none.
-    pub fn handle(&self) -> String {
-        if self.name.is_empty() {
-            shown(&self.path)
-        } else {
-            format!("{SIGIL}{}", self.name)
-        }
-    }
-}
-
-/// The piles of a survey whose config reads.
-pub fn named(survey: &Survey) -> Vec<Named> {
-    survey
-        .rows
-        .iter()
-        .filter_map(|row| {
-            row.config.as_ref().map(|config| Named {
-                path: row.path.clone(),
-                name: config.name.clone(),
-                id: config.id.clone(),
-            })
-        })
-        .collect()
-}
-
 /// Adds what is wrong with each diagram to the survey, each finding to the
 /// row of the `.pile/` it is in. `graph` is the graph of the same files,
 /// given only when every pile's config reads: without it, a diagram is held
-/// to what its file alone shows, and to the piles it names the old way.
+/// to what its file alone shows.
 pub fn check(survey: &mut Survey, files: &[Content], graph: Option<Graph>) {
-    let piles = named(survey);
     let findings = found(files)
         .iter()
-        .flat_map(|d| findings(d, &piles, graph))
+        .flat_map(|d| findings(d, graph))
         .collect();
     survey.add(findings);
 }
@@ -115,10 +80,9 @@ pub fn check(survey: &mut Survey, files: &[Content], graph: Option<Graph>) {
 /// say it should show, each node and edge it does not. Every one is a
 /// problem but `diagram-ignore-unneeded`, a note.
 ///
-/// Without a graph, only what the file alone shows is found, and a pile
-/// named as `pile="@name"` that the repository does not have.
-pub fn findings(diagram: &Diagram, piles: &[Named], graph: Option<Graph>) -> Vec<Finding> {
-    match held(diagram, piles, graph) {
+/// Without a graph, only what the file alone shows is found.
+pub fn findings(diagram: &Diagram, graph: Option<Graph>) -> Vec<Finding> {
+    match held(diagram, graph) {
         Ok(held) => held.findings,
         Err(unread) => unread,
     }
@@ -134,7 +98,7 @@ struct Held {
 
 /// Reads one diagram and holds it to the repository. A diagram that does
 /// not read is the findings that say why.
-fn held(diagram: &Diagram, piles: &[Named], graph: Option<Graph>) -> Result<Held, Vec<Finding>> {
+fn held(diagram: &Diagram, graph: Option<Graph>) -> Result<Held, Vec<Finding>> {
     let Some(source) = &diagram.source else {
         return Err(vec![finding(
             "diagram-invalid",
@@ -165,7 +129,7 @@ fn held(diagram: &Diagram, piles: &[Named], graph: Option<Graph>) -> Result<Held
         wrong,
         standing,
         misses,
-    } = checks::hold(&read.diagram, piles, graph);
+    } = checks::hold(&read.diagram, graph);
     let mut findings: Vec<Finding> = wrong
         .into_iter()
         .map(|w| {
@@ -200,9 +164,9 @@ pub fn stops_drawing(finding: &Finding) -> bool {
 
 /// What a diagram stands for: the node of each element that names one, and
 /// the edge of each line that names one. Nothing for a diagram that does
-/// not read.
-pub fn standing(diagram: &Diagram, piles: &[Named], graph: Option<Graph>) -> Standing {
-    held(diagram, piles, graph)
+/// not read, and without a graph.
+pub fn standing(diagram: &Diagram, graph: Option<Graph>) -> Standing {
+    held(diagram, graph)
         .map(|held| held.standing)
         .unwrap_or_default()
 }
@@ -210,8 +174,8 @@ pub fn standing(diagram: &Diagram, piles: &[Named], graph: Option<Graph>) -> Sta
 /// The nodes and the edges a diagram should show and does not, each as an
 /// answer of a program writes it: `@name`, `type:name`, or an edge's
 /// source, type and target. None for a diagram that does not read.
-pub fn misses(diagram: &Diagram, piles: &[Named], graph: Graph) -> Vec<String> {
-    held(diagram, piles, Some(graph))
+pub fn misses(diagram: &Diagram, graph: Graph) -> Vec<String> {
+    held(diagram, Some(graph))
         .map(|held| held.misses)
         .unwrap_or_default()
 }
@@ -220,17 +184,6 @@ pub fn misses(diagram: &Diagram, piles: &[Named], graph: Graph) -> Vec<String> {
 /// not has the same findings with a graph and without one.
 pub fn asks_graph(diagram: &diagram_format::Diagram) -> bool {
     meta::read(diagram).asks_graph()
-}
-
-/// The pile a diagram's reference names: `@name` by its name, or a `:/`
-/// path by where it is.
-pub fn resolve<'p>(reference: &str, piles: &'p [Named]) -> Option<&'p Named> {
-    if let Some(name) = reference.strip_prefix(SIGIL) {
-        return piles.iter().find(|p| p.name == name);
-    }
-    let path = reference.strip_prefix(FROM_TOP)?;
-    let path = format!("{ROOT}{}", path.trim_end_matches('/'));
-    piles.iter().find(|p| p.path == path)
 }
 
 /// One of a diagram's findings, at a line and a column of its file, or at
@@ -307,31 +260,57 @@ pub fn draw(diagram: &diagram_format::Diagram, as_: As) -> Result<Drawn, String>
 /// Draws a diagram's two versions as one: still, the second with what was
 /// added, removed and changed marked, and listed under it; as a gif, the
 /// first becoming the second. None when the two are of different types.
+///
+/// What changed is decided here, and multipile's diagrams draw exactly
+/// that. They report what the two versions draw differently, and to that
+/// report each element and line of `swapped` is added as changed: drawn
+/// the same, it stands for something else. With nothing swapped, their
+/// report is drawn as it is. Metadata that is only written differently is
+/// no part of either, and marks nothing.
 pub fn draw_diff(
     before: &diagram_format::Diagram,
     after: &diagram_format::Diagram,
+    swapped: &Swapped,
     as_: As,
 ) -> Option<Result<Drawn, String>> {
-    let still = diagram_document::diff_document(before, after, false).ok()?;
+    let mut report = diagram_document::compare(before, after).ok()?;
+    for key in &swapped.elements {
+        report.change(Subject::element(key));
+    }
+    for (from, to) in &swapped.lines {
+        report.change(Subject::line(from, to));
+    }
+    let still = diagram_document::diff_document(before, after, &report, false).ok()?;
     let moving = match as_ {
-        As::Gif => Some(diagram_document::diff_document(before, after, true).ok()?),
+        As::Gif => Some(diagram_document::diff_document(before, after, &report, true).ok()?),
         _ => None,
     };
     Some(draw_documents(&still, moving.as_ref(), as_))
 }
 
 /// Draws a diagram with what a change touched marked: each element and
-/// each line of `touched`, by its key. It is still, so it is drawn as a
-/// page or a picture, and never as a gif.
+/// each line of `touched`, by its key, reported as changed. It is still, so
+/// it is drawn as a page or a picture, and never as a gif.
 pub fn draw_marked(
     diagram: &diagram_format::Diagram,
     touched: &Touched,
     as_: As,
 ) -> Result<Drawn, String> {
-    let still = diagram_document::changed_document(diagram, |mark| match mark {
-        Mark::Element(key) => touched.elements.iter().any(|e| e == key),
-        Mark::Line { from, to } => touched.lines.iter().any(|(f, t)| f == from && t == to),
-    });
+    let report = Report {
+        changed: touched
+            .elements
+            .iter()
+            .map(Subject::element)
+            .chain(
+                touched
+                    .lines
+                    .iter()
+                    .map(|(from, to)| Subject::line(from, to)),
+            )
+            .collect(),
+        ..Report::default()
+    };
+    let still = diagram_document::changed_document(diagram, &report);
     draw_documents(&still, None, as_)
 }
 
@@ -377,9 +356,8 @@ fn draw_documents(
 /// What a change touched of what a diagram stands for.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Touched {
-    /// The piles alone, each once, in the order the file names them: as
-    /// the file names it where it says `pile="@name"`, and as an answer
-    /// writes it otherwise.
+    /// The piles alone, each once, in the order the file draws them, as
+    /// an answer of a program writes one: `@name`.
     pub piles: Vec<String>,
     /// Every node and then every edge, each once, as an answer of a
     /// program writes it: `@name`, `type:name`, or an edge's source, type
@@ -444,21 +422,20 @@ pub struct Listed {
 
 /// Each diagram there is now, and each that is gone, in path order, with
 /// how it changed since a revision, or None. `then` are the diagrams at the
-/// revision, and `now` those of the working copy. `piles` and `graph` are
-/// the working copy's. What the change touched is its caller's to say:
+/// revision, and `now` those of the working copy. `graph` is the working
+/// copy's. What the change touched is its caller's to say:
 /// `touched_piles` the ids of the piles whose files changed, and `touched`
 /// the other nodes and the edges that were added, removed or changed.
 pub fn changes(
     then: &[Diagram],
     now: &[Diagram],
-    piles: &[Named],
     graph: Option<Graph>,
     touched_piles: &BTreeSet<String>,
     touched: &graph::Touched,
 ) -> Vec<Listed> {
     let mut out: Vec<Listed> = now
         .iter()
-        .map(|diagram| listed(then, diagram, piles, graph, touched_piles, touched))
+        .map(|diagram| listed(then, diagram, graph, touched_piles, touched))
         .collect();
     for gone in then
         .iter()
@@ -480,18 +457,17 @@ pub fn changes(
 pub fn listed(
     then: &[Diagram],
     diagram: &Diagram,
-    piles: &[Named],
     graph: Option<Graph>,
     touched_piles: &BTreeSet<String>,
     touched: &graph::Touched,
 ) -> Listed {
-    let held = held(diagram, piles, graph).ok();
+    let held = held(diagram, graph).ok();
     let change = match then.iter().find(|d| d.path == diagram.path) {
         None => Some(Change::Added),
         Some(before) if before.source != diagram.source => Some(Change::Edited),
         Some(_) => {
             let touched = held.as_ref().map_or_else(Touched::default, |held| {
-                touched_in(&held.standing, piles, graph, touched_piles, touched)
+                touched_in(&held.standing, graph, touched_piles, touched)
             });
             (!touched.is_empty()).then_some(Change::Piles(touched))
         }
@@ -507,35 +483,27 @@ pub fn listed(
 /// diagram that does not read.
 pub fn touched_of(
     diagram: &Diagram,
-    piles: &[Named],
     graph: Option<Graph>,
     touched_piles: &BTreeSet<String>,
     touched: &graph::Touched,
 ) -> Touched {
-    held(diagram, piles, graph).map_or_else(
+    held(diagram, graph).map_or_else(
         |_| Touched::default(),
-        |held| touched_in(&held.standing, piles, graph, touched_piles, touched),
+        |held| touched_in(&held.standing, graph, touched_piles, touched),
     )
 }
 
 /// What a change touched of what a diagram stands for.
 fn touched_in(
     standing: &Standing,
-    piles: &[Named],
     graph: Option<Graph>,
     touched_piles: &BTreeSet<String>,
     touched: &graph::Touched,
 ) -> Touched {
     let mut out = Touched::default();
-    // Without a graph a diagram stands for piles alone, each named as it
-    // is typed.
-    let symbol = |node: &graph::Node| match (graph, node) {
-        (Some(g), _) => g.db.symbol(node),
-        (None, graph::Node::Pile(id)) => piles
-            .iter()
-            .find(|p| &p.id == id)
-            .map_or_else(|| id.clone(), Named::handle),
-        (None, graph::Node::Named { of_type, name }) => format!("{of_type}:{name}"),
+    // Without a graph a diagram stands for nothing.
+    let Some(g) = graph else {
+        return out;
     };
     let add = |list: &mut Vec<String>, said: String| {
         if !list.contains(&said) {
@@ -550,12 +518,9 @@ fn touched_in(
         if !is_touched {
             continue;
         }
-        let said = symbol(&element.node);
+        let said = g.db.symbol(&element.node);
         if matches!(element.node, graph::Node::Pile(_)) {
-            add(
-                &mut out.piles,
-                element.written.clone().unwrap_or_else(|| said.clone()),
-            );
+            add(&mut out.piles, said.clone());
         }
         add(&mut out.references, said);
         out.elements.push(element.key.clone());
@@ -564,10 +529,7 @@ fn touched_in(
         if !touched.edges.contains(&line.edge) {
             continue;
         }
-        // A line stands for an edge only when there is a graph.
-        if let Some(g) = graph {
-            add(&mut out.references, g.db.written(&line.edge));
-        }
+        add(&mut out.references, g.db.written(&line.edge));
         out.lines.push((line.from.clone(), line.to.clone()));
     }
     out

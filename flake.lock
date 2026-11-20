@@ -15,6 +15,32 @@
         "type": "github"
       }
     },
+    "diagrams": {
+      "inputs": {
+        "crane": [
+          "crane"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "rust-overlay": [
+          "rust-overlay"
+        ]
+      },
+      "locked": {
+        "lastModified": 1795116535,
+        "narHash": "sha256-2uV4kbr8GNm/U6B8NANlYL8xnDhvIoFK3THBjmXiuC4=",
+        "owner": "multipile",
+        "repo": "diagrams",
+        "rev": "e8c87e5021bd194c268169fdbe1920515b449b3e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "multipile",
+        "repo": "diagrams",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1794042290,
@@ -34,6 +60,7 @@
     "root": {
       "inputs": {
         "crane": "crane",
+        "diagrams": "diagrams",
         "nixpkgs": "nixpkgs",
         "rust-overlay": "rust-overlay"
       }

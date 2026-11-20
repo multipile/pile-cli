@@ -3,14 +3,21 @@
 
 use crate::harness::*;
 
-const DEPS: &str = r#"diagram dependency version=1 {
-  title "What the app depends on"
-  desc "The app depends on the library."
-  box app pile="@app"
-  box lib pile="@lib" focal=#true
-  line app lib
+/// A diagram of the two piles, each box standing for one by its id.
+fn deps() -> String {
+    format!(
+        "diagram dependency version=1 {{\n  title \"What the app depends on\"\n  \
+         desc \"The app depends on the library.\"\n  box app pile:id=\"{}\"\n  \
+         box lib{} focal=#true\n  line app lib\n}}\n",
+        id_of("app"),
+        lib_id()
+    )
 }
-"#;
+
+/// How the box of the library says which pile it stands for.
+fn lib_id() -> String {
+    format!(" pile:id=\"{}\"", id_of("lib"))
+}
 
 /// Two piles, app and lib, each explained, and app keeping one diagram.
 fn with_diagram() -> Repo {
@@ -19,7 +26,7 @@ fn with_diagram() -> Repo {
     r.intent("app", "The application.\n");
     r.declare("lib", "lib", "lib");
     r.intent("lib", "The library.\n");
-    r.write("app/.pile/diagrams/deps.diagram", DEPS);
+    r.write("app/.pile/diagrams/deps.diagram", &deps());
     r.commit("declare");
     r
 }
@@ -60,7 +67,7 @@ fn each_rule_a_diagram_breaks_is_a_problem_at_its_line_and_column() {
     let r = with_diagram();
     r.write(
         "app/.pile/diagrams/deps.diagram",
-        &DEPS.replace("  line app lib\n", "  line app lbi\n"),
+        &deps().replace("  line app lib\n", "  line app lbi\n"),
     );
     let e = r.refused(&["doctor"], 1);
     assert_eq!(e["error"]["code"], "problems-found");
@@ -80,41 +87,58 @@ fn each_rule_a_diagram_breaks_is_a_problem_at_its_line_and_column() {
 }
 
 #[test]
-fn a_pile_no_pile_answers_to_is_a_problem() {
+fn an_id_no_pile_has_is_a_problem() {
     let r = with_diagram();
     r.write(
         "app/.pile/diagrams/deps.diagram",
-        &DEPS.replace("pile=\"@lib\"", "pile=\"@library\""),
+        &deps().replace(&id_of("lib"), &id_of("nobody")),
     );
     let e = r.refused(&["doctor"], 1);
     assert_eq!(problems(&e["result"]), vec!["diagram-no-such-pile"]);
+    let f = &e["result"]["piles"][0]["problems"][0];
+    assert!(
+        f["fix"].as_str().unwrap().contains(lib_id().trim()),
+        "the box's name is a pile's, so the fix says that pile's id: {f}"
+    );
 }
 
 #[test]
-fn a_renamed_pile_is_found_by_the_id_the_diagram_gives() {
+fn a_box_named_otherwise_than_its_pile_is_a_problem() {
     let r = with_diagram();
-    let id = id_of("lib");
     r.write(
         "app/.pile/diagrams/deps.diagram",
-        &DEPS.replace("pile=\"@lib\"", &format!("pile=\"@library\" id=\"{id}\"")),
+        &deps()
+            .replace("box lib", "box library")
+            .replace("app lib", "app library"),
     );
     let e = r.refused(&["doctor"], 1);
     let f = &e["result"]["piles"][0]["problems"][0];
-    assert_eq!(f["code"], "diagram-no-such-pile");
-    assert!(f["message"].as_str().unwrap().contains("now @lib"), "{f}");
-    assert_eq!(f["fix"], "write pile=\"@lib\"");
+    assert_eq!(f["code"], "diagram-name-differs");
+    assert!(f["message"].as_str().unwrap().contains("named lib"), "{f}");
 }
 
 #[test]
-fn a_name_and_an_id_of_two_piles_is_a_problem() {
+fn a_box_stands_for_a_pile_by_pile_id_and_by_no_other_word() {
     let r = with_diagram();
-    let id = id_of("app");
+    // A word the format does not take breaks a rule of the format.
     r.write(
         "app/.pile/diagrams/deps.diagram",
-        &DEPS.replace("pile=\"@lib\"", &format!("pile=\"@lib\" id=\"{id}\"")),
+        &deps().replace(&lib_id(), " pile=\"@lib\""),
     );
     let e = r.refused(&["doctor"], 1);
-    assert_eq!(problems(&e["result"]), vec!["diagram-pile-id-differs"]);
+    assert_eq!(problems(&e["result"]), vec!["diagram-invalid"]);
+    let f = &e["result"]["piles"][0]["problems"][0];
+    assert!(
+        f["message"].as_str().unwrap().contains("property-unknown"),
+        "{f}"
+    );
+    // A word under pile's name that pile does not read is unknown.
+    r.write(
+        "app/.pile/diagrams/deps.diagram",
+        &deps().replace(&lib_id(), " pile:ref=\"@lib\""),
+    );
+    let e = r.refused(&["doctor"], 1);
+    assert_eq!(problems(&e["result"]), vec!["diagram-meta-unknown"]);
 }
 
 #[test]
@@ -221,7 +245,7 @@ fn without_as_the_ending_of_the_file_decides_and_as_wins_over_it() {
 #[test]
 fn render_names_a_diagram_after_its_pile_or_by_its_file() {
     let r = with_diagram();
-    r.write("lib/.pile/diagrams/deps.diagram", DEPS);
+    r.write("lib/.pile/diagrams/deps.diagram", &deps());
     r.commit("a second deps");
     let e = r.refused(&["diagram", "render", "deps"], 1);
     assert_eq!(e["error"]["code"], "diagram-name-ambiguous");
@@ -255,7 +279,7 @@ fn render_refuses_a_diagram_that_breaks_a_rule_and_points_at_doctor() {
     let r = with_diagram();
     r.write(
         "app/.pile/diagrams/deps.diagram",
-        &DEPS.replace("pile=\"@lib\"", "pile=\"@library\""),
+        &deps().replace(&id_of("lib"), &id_of("nobody")),
     );
     let e = r.refused(&["diagram", "render", "deps"], 1);
     assert_eq!(e["error"]["code"], "diagram-invalid");
@@ -276,11 +300,11 @@ fn diagram_alone_says_what_it_takes() {
 /// only @app, whose code did not change.
 fn with_change() -> Repo {
     let r = with_diagram();
-    r.write("app/.pile/diagrams/flow.diagram", DEPS);
-    r.write("app/.pile/diagrams/gone.diagram", DEPS);
+    r.write("app/.pile/diagrams/flow.diagram", &deps());
+    r.write("app/.pile/diagrams/gone.diagram", &deps());
     r.write(
         "app/.pile/diagrams/quiet.diagram",
-        &DEPS.replace("pile=\"@lib\"", ""),
+        &deps().replace(&lib_id(), ""),
     );
     r.write("lib/code.rs", "one\n");
     r.commit("diagrams");
@@ -288,13 +312,13 @@ fn with_change() -> Repo {
     r.write("lib/code.rs", "two\n");
     r.write(
         "app/.pile/diagrams/flow.diagram",
-        &DEPS.replace(
+        &deps().replace(
             "  line app lib",
             "  box db \"db\"\n  line app lib\n  line lib db",
         ),
     );
     std::fs::remove_file(r.path().join("app/.pile/diagrams/gone.diagram")).unwrap();
-    r.write("app/.pile/diagrams/new.diagram", DEPS);
+    r.write("app/.pile/diagrams/new.diagram", &deps());
     r.commit("change");
     r
 }
@@ -435,9 +459,28 @@ fn render_since_refuses_an_edited_diagram_whose_earlier_version_does_not_read() 
     let r = with_diagram();
     r.write("app/.pile/diagrams/flow.diagram", "not a diagram {");
     r.commit("broken");
-    r.write("app/.pile/diagrams/flow.diagram", DEPS);
+    r.write("app/.pile/diagrams/flow.diagram", &deps());
     let e = r.refused(&["diagram", "render", "--since", "HEAD", "flow"], 1);
     assert_eq!(e["error"]["code"], "diagram-not-comparable");
+    // So does one whose earlier version says a word the format does not
+    // take: it is refused, and never drawn as though nothing had changed.
+    r.write(
+        "app/.pile/diagrams/flow.diagram",
+        &deps().replace(&lib_id(), " pile=\"@lib\""),
+    );
+    r.commit("a word that is not taken");
+    r.write("app/.pile/diagrams/flow.diagram", &deps());
+    let e = r.refused(&["diagram", "render", "--since", "HEAD", "flow"], 1);
+    assert_eq!(e["error"]["code"], "diagram-not-comparable");
+    assert!(
+        e["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("its file there breaks a rule of its format"),
+        "{e}"
+    );
+    assert_eq!(e["next"][0]["command"], "pile diagram render flow");
+    assert!(!r.path().join("flow.html").exists(), "nothing is written");
 }
 
 #[test]

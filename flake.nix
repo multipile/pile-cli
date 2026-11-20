@@ -12,6 +12,17 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     crane.url = "github:ipetkov/crane";
+    # multipile's diagrams, for their cases as data: the diagrams they
+    # promise something about, which the tests of crates/diagrams run. Only
+    # that output is used, never their code, which is a Cargo dependency.
+    # flake.lock pins this to the commit crates/diagrams/Cargo.toml pins the
+    # crates to, and scripts/pins fails when the two differ.
+    diagrams = {
+      url = "github:multipile/diagrams";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.rust-overlay.follows = "rust-overlay";
+      inputs.crane.follows = "crane";
+    };
   };
 
   outputs =
@@ -20,6 +31,7 @@
       nixpkgs,
       rust-overlay,
       crane,
+      diagrams,
     }:
     let
       systems = [
@@ -78,6 +90,10 @@
               nativeCheckInputs = [ pkgs.git ];
             };
             cargoArtifacts = craneLib.buildDepsOnly common;
+            # The cases of multipile's diagrams: a directory of diagram files
+            # and cases.json, which lists them. The tests are told where it
+            # is in DIAGRAM_CASES, here in checks.test and in the shell.
+            diagramCases = diagrams.packages.${system}.cases;
           in
           f {
             inherit
@@ -88,6 +104,7 @@
               craneLib
               common
               cargoArtifacts
+              diagramCases
               ;
           }
         );
@@ -113,13 +130,14 @@
       # passes --locked to each. scripts/check runs these and more: the
       # journeys, the cross builds and doctor, which need the shell.
       checks = forAll (
-        { craneLib, common, cargoArtifacts, ... }:
+        { craneLib, common, cargoArtifacts, diagramCases, ... }:
         {
           test = craneLib.cargoTest (
             common
             // {
               inherit cargoArtifacts;
               cargoTestExtraArgs = "--workspace";
+              DIAGRAM_CASES = "${diagramCases}";
             }
           );
           clippy = craneLib.cargoClippy (
@@ -141,10 +159,12 @@
           toolchain,
           zig,
           cargo-zigbuild,
+          diagramCases,
           ...
         }:
         {
           default = pkgs.mkShell {
+            DIAGRAM_CASES = "${diagramCases}";
             packages = [
               toolchain
               zig

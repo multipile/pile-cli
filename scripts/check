@@ -1,8 +1,8 @@
 #!/bin/sh
-# The whole check: build bin/pile, check the formatting, run clippy and every
-# crate's tests, run every journey against bin/pile, build for every platform
-# a release is built for, then ask bin/pile doctor about this repository's
-# own piles. Run it from the root, in the flake's shell. CI runs it on every push and
+# The whole check: hold the two pins of multipile's diagrams to one commit,
+# build bin/pile, check the formatting, run clippy and every crate's tests,
+# run every journey against bin/pile, build for every platform a release is
+# built for, then ask bin/pile doctor about this repository's own piles. Run it from the root, in the flake's shell. CI runs it on every push and
 # pull request.
 #
 # cross is here so that a commit that no longer compiles or links for one of
@@ -13,6 +13,7 @@
 # doctor is last, and prints its report only when it finds a problem, so
 # the check fails with the report in front of whoever ran it.
 set -eu
+scripts/pins
 scripts/build
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings

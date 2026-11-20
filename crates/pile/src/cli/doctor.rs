@@ -78,8 +78,7 @@ pub(super) fn command() -> Command {
              types-outside-aux        a type is created only in an aux pile\n\
              In a diagram, each at its line and column:\n  \
              diagram-invalid          it breaks a rule of its format: fix what it says\n  \
-             diagram-no-such-pile     a name no pile answers to, or an id no pile has\n  \
-             diagram-pile-id-differs  the name and the id it gives are two piles\n  \
+             diagram-no-such-pile     a box's pile:id is the id of no pile\n  \
              diagram-name-differs     a box's pile has another name now: name the box by it\n  \
              diagram-no-such-node     no node of that type and name is at home in that pile\n  \
              diagram-needs-id         a box says its node's type or name, and gives no pile:id\n  \
@@ -255,7 +254,6 @@ fn only_diagrams(
     found: &[storage::Content],
     graph: Option<diagrams::Graph>,
 ) -> Result {
-    let named = diagrams::named(s);
     let all = diagrams::found(found);
     if all.is_empty() {
         putln!(out, "no diagram in any pile");
@@ -275,7 +273,7 @@ fn only_diagrams(
         if i > 0 {
             putln!(out);
         }
-        let findings = diagrams::findings(d, &named, graph);
+        let findings = diagrams::findings(d, graph);
         let of = |severity: Severity| {
             findings
                 .iter()
