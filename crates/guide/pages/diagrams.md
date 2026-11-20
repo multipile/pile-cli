@@ -66,8 +66,9 @@ diagram's file, line and column, and says what fixes it:
   renamed since is `diagram-name-differs`, which says its name now.
 - `diagram-no-such-edge` and `diagram-edge-needs-nodes`: no link of a
   line's `pile:edge` runs between the nodes of its two boxes.
-- `diagram-meta-unknown`: a `pile:` word `pile` does not read. It says
-  the nearest one.
+- `diagram-meta-unknown`: a `pile:` word `pile` does not read.
+- `diagram-hint`, a note: a tier's or a rank's boxes, in another order,
+  have fewer lines meet. It says the order, and the file may ignore it.
 
 A file in `.pile/diagrams/` that does not end in `.diagram` is an unread
 file, as any other file in a `.pile/` is.

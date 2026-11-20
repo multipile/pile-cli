@@ -60,6 +60,12 @@ a note. So a diagram that should show a pile and does not fails doctor
 until the pile is drawn, or ignored with a reason: that is how a new
 pile reaches the diagrams it belongs in.
 
+A `diagram-hint` is a note of another sort, and needs no graph. The
+boxes of an architecture diagram's tier, or of a dependency diagram's
+rank, are drawn in the order the file writes them. Where another order
+has fewer lines meet, the hint says that order, at the line to rewrite.
+A hint is advice the file may ignore: the diagram is drawn as written.
+
 While any pile's config does not read, the graph is not whole. doctor
 then reports the config, and of each diagram only what its file alone
 shows. Fix the config first.

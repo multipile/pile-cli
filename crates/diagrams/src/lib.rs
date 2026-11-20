@@ -17,6 +17,10 @@
 //! findings ([`findings`]), what a change touched of what a diagram stands
 //! for ([`changes`]), what an edited diagram stands for that it did not
 //! ([`swapped`]), and what it should show and does not ([`misses`]).
+//!
+//! multipile's diagrams also hint where a file's own choice draws worse
+//! than another it could make. A hint is theirs, and is passed on among
+//! doctor's findings as a note ([`hints`]).
 
 use std::collections::BTreeSet;
 
@@ -78,14 +82,48 @@ pub fn check(survey: &mut Survey, files: &[Content], graph: Option<Graph>) {
 /// its format it breaks; each word of `pile`'s metadata that is not one;
 /// each box and line that stands for nothing; and, of what its includes
 /// say it should show, each node and edge it does not. Every one is a
-/// problem but `diagram-ignore-unneeded`, a note.
+/// problem but `diagram-ignore-unneeded`, a note. Among them, for a
+/// diagram that reads, is each hint of [`hints`], a note too.
 ///
 /// Without a graph, only what the file alone shows is found.
 pub fn findings(diagram: &Diagram, graph: Option<Graph>) -> Vec<Finding> {
     match held(diagram, graph) {
-        Ok(held) => held.findings,
+        Ok(held) => {
+            let mut findings = held.findings;
+            findings.extend(hints(diagram));
+            findings.sort_by_key(|f| (f.line, f.column));
+            findings
+        }
         Err(unread) => unread,
     }
+}
+
+/// Where a diagram's own choice draws worse than another it could make,
+/// as multipile's diagrams hint it: each a `diagram-hint`, a note at the
+/// line and column of the choice, whose message ends with their code for
+/// it and whose fix is what to write instead. A hint comes from the file
+/// alone, so it needs no graph. It is advice: it stops nothing being drawn,
+/// and the diagram is drawn as written. None for a diagram that does not
+/// read.
+pub fn hints(diagram: &Diagram) -> Vec<Finding> {
+    let Some(source) = &diagram.source else {
+        return Vec::new();
+    };
+    let Ok(read) = diagram_format::read(source) else {
+        return Vec::new();
+    };
+    diagram_document::hints(&read.diagram)
+        .into_iter()
+        .map(|hint| {
+            finding(
+                "diagram-hint",
+                &diagram.path,
+                Some(locate(source, hint.span.offset)),
+                format!("{} ({})", hint.message, hint.code),
+                hint.help,
+            )
+        })
+        .collect()
 }
 
 /// A diagram that reads, held to the repository once: its findings, in the
@@ -151,7 +189,7 @@ fn held(diagram: &Diagram, graph: Option<Graph>) -> Result<Held, Vec<Finding>> {
 /// that stands for nothing, or any other problem, is not.
 fn counts(code: &str) -> (Severity, bool) {
     match code {
-        "diagram-ignore-unneeded" => (Severity::Note, false),
+        "diagram-ignore-unneeded" | "diagram-hint" => (Severity::Note, false),
         "diagram-misses-node" | "diagram-misses-link" => (Severity::Problem, false),
         _ => (Severity::Problem, true),
     }

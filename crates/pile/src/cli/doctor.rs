@@ -97,6 +97,7 @@ pub(super) fn command() -> Command {
              A note is something to know, and breaks nothing:\n  \
              unread-file              a file in .pile/ that pile does not read\n  \
              diagram-ignore-unneeded  an ignore of what a diagram draws, or need not show\n  \
+             diagram-hint             a diagram's order makes lines meet: it says a better one\n  \
              not-committed            a clone would not have the pile yet: commit it\n  \
              not-a-pile               a .pile/ with no config: init, or remove it\n  \
              unmade                   the config is gone, and its removal is not committed\n  \
