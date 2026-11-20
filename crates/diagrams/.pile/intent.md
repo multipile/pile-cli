@@ -13,7 +13,9 @@ should show and does not, which of those it stands for a change
 touched, and what changed in an edited diagram: what its two versions
 draw differently, and each box or line that now stands for something
 else. Handing a diagram that reads to multipile's diagrams to draw
-belongs here too, with the change this crate decides. What a diagram may
+belongs here too, with the change this crate decides, and so does
+passing on, as a note of doctor's, each hint they give of a file's own
+choice that draws worse than another. What a diagram may
 say, how it is laid out, how it looks and how it is rendered do not
 belong here: they are multipile's diagrams', pinned in this crate's
 manifest, which keep metadata and never read it, report what two

@@ -491,3 +491,106 @@ fn since_refuses_a_revision_there_is_not() {
     let e = r.refused(&["diagram", "render", "--since", "a..b", "deps"], 2);
     assert_eq!(e["error"]["code"], "usage");
 }
+
+/// A diagram that reads, written in an order that makes two lines meet:
+/// lines from posts and from auth meet on their way to db and cache, and
+/// either tier in the other order keeps them apart.
+const SERVICES: &str = r#"diagram architecture version=1 {
+  title "How the blog's parts talk to one another"
+  desc "The pages ask the posts and the auth services, which keep their data in the database."
+  flow right
+  box ui "blog-ui"
+  box posts "posts" focal=#true
+  box auth "auth"
+  box db "db" as=store
+  box cache "cache" as=store
+  tier ui
+  tier posts auth
+  tier db cache
+  line ui posts label="posts"
+  line ui auth label="sign in"
+  line posts db label="read"
+  line posts cache label="hot posts"
+  line auth db label="sessions"
+}
+"#;
+
+#[test]
+fn an_order_that_makes_lines_meet_is_hinted_as_a_note_and_breaks_nothing() {
+    let r = with_diagram();
+    r.write("app/.pile/diagrams/services.diagram", SERVICES);
+    let file = ":/app/.pile/diagrams/services.diagram";
+
+    // doctor exits 0, and each hint is a note at the line of its tier.
+    let v = r.result(&["doctor"]);
+    assert_eq!(v["total"]["problems"], 0, "{v}");
+    assert_eq!(v["total"]["notes"], 2, "{v}");
+    assert_eq!(v["piles"][0]["problems"], serde_json::json!([]));
+    let notes = v["piles"][0]["notes"].as_array().unwrap();
+    for (note, line, fix) in [
+        (
+            &notes[0],
+            11,
+            "write `tier auth posts`, and they meet nowhere",
+        ),
+        (
+            &notes[1],
+            12,
+            "write `tier cache db`, and they meet nowhere",
+        ),
+    ] {
+        assert_eq!(note["code"], "diagram-hint");
+        assert_eq!(note["file"], file);
+        assert_eq!(
+            (note["line"].as_u64(), note["column"].as_u64()),
+            (Some(line), Some(3))
+        );
+        // The message is the library's, and ends with the library's code.
+        let message = note["message"].as_str().unwrap();
+        assert!(message.starts_with("in this order, lines meet "), "{note}");
+        assert!(message.ends_with(" (tier-order-crosses)"), "{note}");
+        assert_eq!(note["fix"], fix);
+    }
+
+    // doctor --diagrams says the same, and a diagram with no such choice
+    // has no hint.
+    let v = r.result(&["doctor", "--diagrams"]);
+    assert_eq!(v["total"]["problems"], 0, "{v}");
+    assert_eq!(v["total"]["needing_attention"], 0, "{v}");
+    assert_eq!(v["total"]["notes"], 2, "{v}");
+    assert_eq!(v["diagrams"][0]["name"], "deps");
+    assert_eq!(v["diagrams"][0]["notes"], serde_json::json!([]));
+    assert_eq!(v["diagrams"][1]["notes"][1]["code"], "diagram-hint");
+    let text = r.stdout(&["doctor", "--diagrams", "--format", "text"]);
+    contains!(
+        text,
+        &format!("note      {file}:12:3: in this order, lines meet ")
+    );
+    contains!(
+        text,
+        "(tier-order-crosses). Write `tier cache db`, and they meet nowhere"
+    );
+    contains!(text, "2 diagrams, nothing wrong: 2 notes");
+
+    // A hint stops nothing: the diagram is drawn as written.
+    let v = r.result(&["diagram", "render", "services"]);
+    assert_eq!(v["out"], "services.html");
+    assert!(r.read("services.html").starts_with("<!DOCTYPE html>"));
+
+    // A hint needs no graph: it is given while a config does not read.
+    r.write(
+        "lib/.pile/config",
+        "kind = gitpile\nversion = 1\nid = nonsense\n",
+    );
+    let e = r.refused(&["doctor"], 1);
+    assert_eq!(e["result"]["total"]["notes"], 2, "{e}");
+    r.git(&["checkout", "-q", "lib/.pile/config"]);
+
+    // Written as one hint says, nothing meets, and neither hint is left.
+    r.write(
+        "app/.pile/diagrams/services.diagram",
+        &SERVICES.replace("tier db cache", "tier cache db"),
+    );
+    let v = r.result(&["doctor"]);
+    assert_eq!(v["total"]["notes"], 0, "{v}");
+}

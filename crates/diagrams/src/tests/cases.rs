@@ -53,10 +53,16 @@ impl Case {
         }
     }
 
-    /// The same file, read. An error says what stopped it reading.
+    /// The same file, read. An error says what stopped it reading. A hint
+    /// is no such finding: a case that reads may be written in an order
+    /// that draws worse than another, and is drawn as written. Anything
+    /// else found of it fails the case, a note too.
     fn read(&self, key: &str) -> Result<diagram_format::Diagram, String> {
         let diagram = self.diagram(key);
-        let found = findings(&diagram, None);
+        let found: Vec<Finding> = findings(&diagram, None)
+            .into_iter()
+            .filter(|f| f.code != "diagram-hint")
+            .collect();
         if !found.is_empty() {
             return Err(format!("{key} has findings: {}", told(&found)));
         }
@@ -191,6 +197,78 @@ fn every_valid_case_has_no_finding_and_is_drawn_as_a_page_and_a_picture() {
         starts(draw(&diagram, As::Png), As::Png, PNG)?;
         Ok(())
     });
+}
+
+/// The hints of a valid case, and nothing else found of it: each a note at
+/// its line and column, which names the library's code and says what to
+/// write. Written as `better` rewrites it, which follows one of them, the
+/// same diagram has no finding at all.
+fn hinted(name: &str, code: &str, hints_at: &[(usize, usize, &str)], better: (&str, &str)) {
+    let case = cases("valid")
+        .into_iter()
+        .find(|case| case.name == name)
+        .unwrap_or_else(|| panic!("{CASES}: cases.json lists no valid case {name}"));
+    let mut diagram = case.diagram("path");
+    let found = findings(&diagram, None);
+    assert_eq!(found.len(), hints_at.len(), "{name}: {}", told(&found));
+    for (hint, (line, column, fix)) in found.iter().zip(hints_at) {
+        assert_eq!(hint.code, "diagram-hint");
+        assert_eq!(hint.severity, Severity::Note);
+        assert_eq!((hint.line, hint.column), (Some(*line), Some(*column)));
+        assert!(
+            hint.message.ends_with(&format!("({code})")),
+            "{}",
+            hint.message
+        );
+        assert_eq!(hint.fix, *fix);
+        assert!(!stops_drawing(hint), "a hint stops nothing being drawn");
+    }
+    assert_eq!(hints(&diagram), found, "a hint needs no graph");
+
+    let source = diagram.source.take().unwrap();
+    let rewritten = source.replace(better.0, better.1);
+    assert_ne!(rewritten, source, "{name}: nothing was rewritten");
+    diagram.source = Some(rewritten);
+    assert_eq!(findings(&diagram, None), vec![], "{name}, as hinted");
+}
+
+#[test]
+fn a_tier_whose_order_makes_lines_meet_is_hinted_a_better_order() {
+    // Either tier, in the other order, keeps the two lines apart.
+    hinted(
+        "architecture/a-line-shares-a-channel",
+        "tier-order-crosses",
+        &[
+            (14, 3, "write `tier auth posts`, and they meet nowhere"),
+            (15, 3, "write `tier cache db`, and they meet nowhere"),
+        ],
+        ("tier db cache", "tier cache db"),
+    );
+}
+
+#[test]
+fn a_rank_whose_order_makes_lines_meet_is_hinted_a_better_order() {
+    // A rank's hint is at the first box of the rank.
+    hinted(
+        "dependency/a-rank-written-in-a-crossing-order",
+        "rank-order-crosses",
+        &[
+            (
+                7,
+                3,
+                "write them in the order server, pages, and they meet nowhere",
+            ),
+            (
+                9,
+                3,
+                "write them in the order icons, db, and they meet nowhere",
+            ),
+        ],
+        (
+            "  box db \"db\"\n  box icons \"icons\"\n",
+            "  box icons \"icons\"\n  box db \"db\"\n",
+        ),
+    );
 }
 
 #[test]
